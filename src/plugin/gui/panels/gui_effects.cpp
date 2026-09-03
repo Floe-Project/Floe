@@ -1330,19 +1330,20 @@ static void DoEffectParams(GuiState& g,
                                               .parent = param_container,
                                               .layout {
                                                   .size = layout::k_hug_contents,
-                                                  .contents_gap = 12,
+                                                  .contents_gap = 16,
                                                   .contents_direction = layout::Direction::Row,
                                               },
                                           });
 
-            auto const do_meter_column = [&](u64 index, String label, auto draw) {
+            auto const do_meter_column = [&](u64 index, String label, auto draw, bool gr = false) {
                 auto const column =
                     DoBox(g.builder,
                           {
                               .parent = meters_row,
                               .id_extra = index,
                               .layout {
-                                  .size = {k_peak_meter_standard_width, layout::k_hug_contents},
+                                  .size = {!gr ? k_peak_meter_standard_width : 9, layout::k_hug_contents},
+                                  .contents_gap = 3,
                                   .contents_direction = layout::Direction::Column,
                               },
                           });
@@ -1374,24 +1375,38 @@ static void DoEffectParams(GuiState& g,
                               &limiter.limiter_dsp.input_peak_meter,
                               {
                                   .flash_when_clipping = false,
+                                  .show_min_max_markers = true,
+                                  .min_db = -42,
+                                  .max_db = 6,
+                                  .marker_interval_db = 6,
                                   .marker_db = ceiling_db - gain_db,
                                   .marker_col = ToU32(highlight_col),
+                                  .low_signal_threshold_db = -60.0f,
                               });
             });
-            do_meter_column(1, "GR"_s, [&](Rect r) {
-                DrawGainReductionMeter(g.imgui,
-                                       r,
-                                       limiter.limiter_dsp.GainReductionDb(),
-                                       ToU32(highlight_col));
-            });
+            do_meter_column(
+                1,
+                "GR"_s,
+                [&](Rect r) {
+                    DrawGainReductionMeter(g.imgui,
+                                           r,
+                                           limiter.limiter_dsp.GainReductionDb(),
+                                           ToU32(highlight_col));
+                },
+                true);
             do_meter_column(2, "Out"_s, [&](Rect r) {
                 DrawPeakMeter(g.imgui,
                               r,
                               &limiter.limiter_dsp.output_peak_meter,
                               {
                                   .flash_when_clipping = true,
+                                  .show_min_max_markers = true,
+                                  .min_db = -42,
+                                  .max_db = 6,
+                                  .marker_interval_db = 6,
                                   .marker_db = ceiling_db,
                                   .marker_col = ToU32(highlight_col),
+                                  .low_signal_threshold_db = -50.0f,
                               });
             });
 

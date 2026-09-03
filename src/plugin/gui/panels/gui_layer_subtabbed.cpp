@@ -616,7 +616,12 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
             DrawPeakMeter(g.imgui,
                           g.imgui.ViewportRectToWindowRect(*r),
                           &layer_processor.peak_meter,
-                          {.flash_when_clipping = false});
+                          {
+                              .flash_when_clipping = false,
+                              .show_min_max_markers = true,
+                              .min_db = -60,
+                              .max_db = 12,
+                          });
 
         // Volume slider
         {

@@ -692,7 +692,14 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
         DrawPeakMeter(g.imgui,
                       builder.imgui.RegisterAndConvertRect(*viewport_r),
                       &g.engine.processor.peak_meter,
-                      {.flash_when_clipping = true});
+                      {
+                          .flash_when_clipping = true,
+                          .show_min_max_markers = true,
+                          .min_db = -36,
+                          .max_db = 6,
+                          .marker_interval_db = 6,
+                          .low_signal_threshold_db = -60.0f,
+                      });
 }
 
 void TopPanel(GuiState& g, Rect bounds, GuiFrameContext const& frame_context) {

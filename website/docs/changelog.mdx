@@ -15,8 +15,10 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 ## 2.0.4-beta.1
-- Add LUFS meter
-- Add a peak-hold line to the peak meters: it marks the highest level reached, holds there for a moment, then falls back
+- Add a new Limiter effect: a lookahead true-peak brickwall limiter with Gain and Ceiling controls, plus input, gain-reduction and output meters, intended primarily for the end of the effects chain
+- Add LUFS meter to top panel
+- Add a peak-hold line to all peak meters: it marks the highest level reached, holds there for a moment, then falls back
+- Change the peak meter ranges and add min/max markers: top panel meter -60dB to +10dB becomes -36dB to +6dB with markers every 6dB, layer mixer meter -60dB to +10dB becomes -60dB to +12dB with markers every 12dB
 - Huge improvements to the distortion effect:
   - 10 new/upgraded distortion types: more musical and balanced with smooth gain compensation
   - Cleaner sound with 4x oversampling, anti-aliasing and DC offset removal
@@ -34,7 +36,6 @@ For instance: 0.0.1. Don't change the headings.
 - Add right-click menu and double-click value entry to macro destination knobs, with options to enter, copy, paste, reset and invert the amount
 - Add copy and paste for effects: right-click an effect or the empty space of the FX rack to copy a single effect or the entire rack (all effects, their order and settings) and paste it, including from one preset to another
 - Add the ability to activate multiple encrypted packages at once by loading a single license file
-- Add a new Limiter effect: a lookahead true-peak brickwall limiter with Gain and Ceiling controls, plus input, gain-reduction and output meters, intended primarily for the end of the effects chain
 - Fix newly played notes ignoring the current pitch wheel position until the wheel next moved
 - Fix preferences file becoming blank or truncated: preferences are now written atomically
 - Fix window opening larger than the screen when the saved window size is invalid: window sizes are now always constrained to fit the current display

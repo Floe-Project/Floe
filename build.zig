@@ -278,6 +278,7 @@ fn applyUniversalSettings(
     step.addIncludePath(ctx.dep_clap.path("include"));
     step.addIncludePath(ctx.dep_icon_font_cpp_headers.path(""));
     step.addIncludePath(ctx.dep_dr_libs.path(""));
+    step.addIncludePath(ctx.dep_ebur128.path("ebur128"));
     step.addIncludePath(ctx.dep_flac.path("include"));
     step.addIncludePath(ctx.dep_lua.path(""));
     step.addIncludePath(ctx.dep_pugl.path("include"));
@@ -506,6 +507,7 @@ pub fn build(b: *std.Build) void {
         .dep_clap = b.dependency("clap", .{}),
         .dep_clap_wrapper = b.dependency("clap_wrapper", .{}),
         .dep_dr_libs = b.dependency("dr_libs", .{}),
+        .dep_ebur128 = b.dependency("ebur128", .{}),
         .dep_flac = b.dependency("flac", .{}),
         .dep_icon_font_cpp_headers = b.dependency("icon_font_cpp_headers", .{}),
         .dep_miniz = b.dependency("miniz", .{}),
@@ -700,6 +702,7 @@ pub fn build(b: *std.Build) void {
             break :blk buildDocsGenerator(&ctx, &native_target_cfg, .{
                 .common_infrastructure = buildCommonInfrastructure(&ctx, &native_target_cfg, .{
                     .dr_wav = buildDrWav(&ctx, &native_target_cfg),
+                    .ebur128 = buildEbur128(&ctx, &native_target_cfg),
                     .flac = buildFlac(&ctx, &native_target_cfg),
                     .xxhash = buildXxhash(&ctx, &native_target_cfg),
                     .library = buildFloeLibrary(&ctx, &native_target_cfg, .{
@@ -729,6 +732,7 @@ pub fn build(b: *std.Build) void {
             const distortion_table_generator = buildDistortionTableGenerator(&ctx, &native_target_cfg, .{
                 .common_infrastructure = buildCommonInfrastructure(&ctx, &native_target_cfg, .{
                     .dr_wav = buildDrWav(&ctx, &native_target_cfg),
+                    .ebur128 = buildEbur128(&ctx, &native_target_cfg),
                     .flac = buildFlac(&ctx, &native_target_cfg),
                     .xxhash = buildXxhash(&ctx, &native_target_cfg),
                     .library = buildFloeLibrary(&ctx, &native_target_cfg, .{
@@ -818,6 +822,23 @@ fn buildXxhash(ctx: *const BuildContext, cfg: *const TargetConfig) *std.Build.St
             .gen_cdb_fragments = true,
         }).flags.items,
     });
+    obj.linkLibC();
+    return obj;
+}
+
+fn buildEbur128(ctx: *const BuildContext, cfg: *const TargetConfig) *std.Build.Step.Compile {
+    const obj = ctx.b.addObject(.{
+        .name = "ebur128",
+        .root_module = ctx.b.createModule(cfg.module_options),
+    });
+    obj.addCSourceFile(.{
+        .file = ctx.dep_ebur128.path("ebur128/ebur128.c"),
+        .flags = FlagsBuilder.init(ctx, cfg, .{
+            .gen_cdb_fragments = true,
+        }).flags.items,
+    });
+    obj.addIncludePath(ctx.dep_ebur128.path("ebur128"));
+    obj.addIncludePath(ctx.dep_ebur128.path("ebur128/queue"));
     obj.linkLibC();
     return obj;
 }
@@ -1492,6 +1513,7 @@ fn buildFftConvolver(ctx: *const BuildContext, cfg: *const TargetConfig) *std.Bu
 
 fn buildCommonInfrastructure(ctx: *const BuildContext, cfg: *const TargetConfig, deps: struct {
     dr_wav: *std.Build.Step.Compile,
+    ebur128: *std.Build.Step.Compile,
     flac: *std.Build.Step.Compile,
     xxhash: *std.Build.Step.Compile,
     library: *std.Build.Step.Compile,
@@ -1574,6 +1596,7 @@ fn buildCommonInfrastructure(ctx: *const BuildContext, cfg: *const TargetConfig,
 
     lib.linkLibrary(lua);
     lib.addObject(deps.dr_wav);
+    lib.addObject(deps.ebur128);
     lib.linkLibrary(deps.flac);
     lib.addObject(deps.xxhash);
     lib.addConfigHeader(cfg.floe_config_h);
@@ -2969,6 +2992,7 @@ fn doTarget(
     const debug_info_lib = buildDebugInfo(ctx, cfg);
     const stb_image = buildStbImage(ctx, cfg);
     const dr_wav = buildDrWav(ctx, cfg);
+    const ebur128 = buildEbur128(ctx, cfg);
     const miniz = buildMiniz(ctx, cfg);
     const flac = buildFlac(ctx, cfg);
     const fft_convolver = buildFftConvolver(ctx, cfg);
@@ -2994,6 +3018,7 @@ fn doTarget(
 
     const common_infrastructure = buildCommonInfrastructure(ctx, cfg, .{
         .dr_wav = dr_wav,
+        .ebur128 = ebur128,
         .flac = flac,
         .library = library,
         .miniz = miniz,

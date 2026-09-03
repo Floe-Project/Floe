@@ -45,6 +45,7 @@ pub const BuildContext = struct {
     dep_clap: *std.Build.Dependency,
     dep_clap_wrapper: *std.Build.Dependency,
     dep_dr_libs: *std.Build.Dependency,
+    dep_ebur128: *std.Build.Dependency,
     dep_flac: *std.Build.Dependency,
     dep_icon_font_cpp_headers: *std.Build.Dependency,
     dep_miniz: *std.Build.Dependency,

@@ -90,6 +90,20 @@ The convolution unit adds a reverb-like effect to the sound by utilising an impu
 
 The set of available IRs depend on what sample libraries you have installed and their features. Floe always has a built-in set of impulse responses available. But additionally, some sample libraries expand this collection, such as the community [Antique IRs](/packages/antique-irs) library.
 
+## Limiter
+
+The limiter is a brickwall limiter: it catches loud peaks and holds your output firmly below a maximum level, letting you push a sound louder without it clipping. It's usually placed last in the rack so it can catch everything above it.
+
+- **Gain**: drives the signal harder into the limiter before it's limited. Turn this up to make the sound louder overall; the limiter will hold the peaks in check.
+- **Ceiling**: the maximum output level. A small safety margin below 0dB is recommended rather than setting this to exactly 0dB.
+- **Mix**: as with other effects, blends between the dry and limited signal.
+
+Three meters show what the limiter is doing: _In_ (the incoming level), _GR_ (how much gain reduction is currently being applied), and _Out_ (the final level).
+
+The limiter measures true peak rather than just the level of individual samples, which means it also catches peaks that occur in between samples — the kind that can appear once audio is played back or converted to a lossy format like MP3. This makes the Ceiling a more reliable guarantee of the loudest the signal will actually get. To do this, it looks a tiny fraction of a millisecond ahead in the audio so it can react before a peak arrives. This delay is small enough (0.5 ms) that Floe absorbs it internally rather than asking your DAW to compensate for it, so you won't notice it or need to do anything about it.
+
+Thanks to that same short lookahead, the limiter is fast and transparent for moderate amounts of limiting. Push it hard — asking for a large amount of gain reduction — and there's less room for the gain change to ramp smoothly, so you may start to hear it colour or slightly distort the sound. If that happens, try backing off the Gain or raising the Ceiling a little.
+
 ## All available effects
 
 <table>

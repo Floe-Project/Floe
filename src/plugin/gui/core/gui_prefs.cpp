@@ -33,6 +33,14 @@ prefs::Descriptor SettingDescriptor(GuiPreference setting) {
                 .gui_label = "Show instance name",
                 .long_description = "Show the name of the instance in the top panel GUI.",
             };
+        case GuiPreference::ShowLufsMeter:
+            return {
+                .key = "show-lufs-meter"_s,
+                .value_requirements = prefs::ValueType::Bool,
+                .default_value = false,
+                .gui_label = "Show LUFS meter",
+                .long_description = "Show the loudness (LUFS) meter and readouts in the top panel GUI.",
+            };
         case GuiPreference::WindowWidth:
             return {
                 .key = prefs::key::k_window_width,

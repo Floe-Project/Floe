@@ -715,7 +715,8 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                       });
 
     // loudness meter
-    {
+    if (prefs::GetBool(g.engine.shared_engine_systems.prefs,
+                        SettingDescriptor(GuiPreference::ShowLufsMeter))) {
         constexpr f32 k_loudness_target_lufs = -22.0f;
         constexpr f32 k_loudness_target_tolerance_lu = 1.0f;
         constexpr f32 k_loudness_readout_width = 40;

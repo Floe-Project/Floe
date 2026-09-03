@@ -423,13 +423,35 @@ void DrawPeakMeter(imgui::Context& imgui,
     if (small) imgui.draw_list->renderer.anti_aliased_shapes = false;
     DEFER { imgui.draw_list->renderer.anti_aliased_shapes = saved_aa; };
 
-    // Background channels.
+    // Segment boundaries as integer y-offsets from origin.
+    auto const top_seg_y = (s32)((1 - MapTo01(0.0f, k_min_db, k_max_db)) * (f32)total_h);
+    auto const mid_seg_y = (s32)((1 - MapTo01(-12.0f, k_min_db, k_max_db)) * (f32)total_h);
+
+    // Background channels. The region above 0dB gets a subtly brighter background to hint at the overload
+    // range. The two regions are drawn adjacent (not overlaid) so the translucent background isn't
+    // double-blended.
+    auto const back_col = LiveCol(UiColMap::PeakMeterBack);
+    auto const top_back_col = ToU32({.c = Col::Black, .alpha = 44});
+    auto const split_y = Clamp(top_seg_y, 0, total_h);
     for (auto const chan_index : Range(k_num_channels)) {
         auto const cx = chan_xs[chan_index];
-        imgui.draw_list->AddRectFilled(f32x2 {origin_x + (f32)cx, origin_y},
-                                       f32x2 {origin_x + (f32)(cx + chan_w), origin_y + (f32)total_h},
-                                       LiveCol(UiColMap::PeakMeterBack),
-                                       rounding);
+        auto const x0 = origin_x + (f32)cx;
+        auto const x1 = origin_x + (f32)(cx + chan_w);
+
+        // Above 0dB (rounded top corners).
+        if (split_y > 0)
+            imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y},
+                                           f32x2 {x1, origin_y + (f32)split_y},
+                                           top_back_col,
+                                           rounding,
+                                           0b1100);
+        // Below 0dB (rounded bottom corners).
+        if (split_y < total_h)
+            imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y + (f32)split_y},
+                                           f32x2 {x1, origin_y + (f32)total_h},
+                                           back_col,
+                                           rounding,
+                                           0b0011);
     }
 
     // dB markers.
@@ -462,6 +484,11 @@ void DrawPeakMeter(imgui::Context& imgui,
     constexpr f32 k_peak_min_db = -60;
     constexpr f32 k_min_amp = constexpr_math::Powf(10, k_peak_min_db / 20);
 
+    // The processor stops notifying us when it goes silent, so keep animating while there's anything to
+    // show; that way we pick up the meter being zeroed instead of leaving a stale level on screen.
+    if (Any(v > k_min_amp) || Any(snapshot.hold_levels > k_min_amp))
+        GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+
     // Level positions as integer y-offsets from origin.
     auto const clamped_v = Max(v, f32x2(k_min_amp));
     auto const v_db = 20 * Log10(clamped_v);
@@ -475,10 +502,6 @@ void DrawPeakMeter(imgui::Context& imgui,
         if (v_db[0] > threshold) level_y_l = Min(level_y_l, sliver_y);
         if (v_db[1] > threshold) level_y_r = Min(level_y_r, sliver_y);
     }
-
-    // Segment boundaries as integer y-offsets from origin.
-    auto const top_seg_y = (s32)((1 - MapTo01(0.0f, k_min_db, k_max_db)) * (f32)total_h);
-    auto const mid_seg_y = (s32)((1 - MapTo01(-12.0f, k_min_db, k_max_db)) * (f32)total_h);
 
     // Draw level segments for each channel.
     s32 const level_ys[] = {level_y_l, level_y_r};
@@ -517,6 +540,32 @@ void DrawPeakMeter(imgui::Context& imgui,
                                            col,
                                            rounding,
                                            0b0011);
+        }
+    }
+
+    // Peak-hold lines. Positioned with the same rounding as the level bars so a line sits exactly at the
+    // top edge of where the level actually reached, never above it, and coloured to match the segment it
+    // falls in.
+    auto const hold_line_h = Max(1.0f, Round(WwToPixels(1.0f)));
+    if ((f32)total_h > hold_line_h) {
+        auto const hold_db = 20 * Log10(Max(snapshot.hold_levels, f32x2(k_min_amp)));
+        for (auto const chan_index : Range(k_num_channels)) {
+            if (hold_db[chan_index] <= k_min_db) continue;
+            auto const hold_01 = Clamp01(MapTo01(hold_db[chan_index], k_min_db, k_max_db));
+            auto const hold_y = total_h - (s32)(hold_01 * (f32)total_h);
+            auto const y = Clamp((f32)hold_y, 0.0f, (f32)total_h - hold_line_h);
+
+            auto col = LiveCol(UiColMap::PeakMeterHighlightBottom);
+            if (hold_y < top_seg_y)
+                col = LiveCol(UiColMap::PeakMeterHighlightTop);
+            else if (hold_y < mid_seg_y)
+                col = LiveCol(UiColMap::PeakMeterHighlightMiddle);
+            if (did_clip) col = LiveCol(UiColMap::PeakMeterClipping);
+
+            auto const cx = chan_xs[chan_index];
+            imgui.draw_list->AddRectFilled(f32x2 {origin_x + (f32)cx, origin_y + y},
+                                           f32x2 {origin_x + (f32)(cx + chan_w), origin_y + y + hold_line_h},
+                                           col);
         }
     }
 
@@ -591,16 +640,17 @@ void DrawLoudnessMeter(imgui::Context& imgui, Rect r, DrawLoudnessMeterOptions c
         return origin_y +
                (f32)(s32)((1 - MapTo01(clamp_lufs(lufs), options.min_lufs, options.max_lufs)) * (f32)total_h);
     };
+    auto const good_col = LiveCol(UiColMap::LoudnessMeterGood);
     auto const col_for_lufs = [&](f32 lufs) {
         if (lufs < options.target_min_lufs)
-            return LerpColours(options.good_col,
-                               options.quiet_col,
+            return LerpColours(good_col,
+                               LiveCol(UiColMap::LoudnessMeterQuiet),
                                Clamp01((options.target_min_lufs - lufs) / options.fade_lu));
         if (lufs > options.target_max_lufs)
-            return LerpColours(options.good_col,
-                               options.hot_col,
+            return LerpColours(good_col,
+                               LiveCol(UiColMap::LoudnessMeterHot),
                                Clamp01((lufs - options.target_max_lufs) / options.fade_lu));
-        return options.good_col;
+        return good_col;
     };
 
     imgui.draw_list->AddRectFilled(f32x2 {bar_x0, origin_y},
@@ -636,15 +686,11 @@ void DrawLoudnessMeter(imgui::Context& imgui, Rect r, DrawLoudnessMeterOptions c
                                                  lo_col);
     }
 
-    imgui.draw_list->AddRectFilled(f32x2 {bar_x0, y_for_lufs(options.target_max_lufs)},
-                                   f32x2 {bar_x1, y_for_lufs(options.target_min_lufs)},
-                                   options.band_col);
-
     if (options.momentary_lufs > options.min_lufs) {
         auto const marker_y = y_for_lufs(options.momentary_lufs);
         imgui.draw_list->AddLine(f32x2 {bar_x0, marker_y},
                                  f32x2 {bar_x1, marker_y},
-                                 options.momentary_col,
+                                 LiveCol(UiColMap::LoudnessMeterMomentaryMarker),
                                  WwToPixels(1.0f));
     }
 }

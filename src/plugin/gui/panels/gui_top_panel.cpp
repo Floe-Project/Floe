@@ -750,11 +750,6 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                   .momentary_lufs = snapshot.momentary_lufs,
                                   .target_min_lufs = k_loudness_target_lufs - k_loudness_target_tolerance_lu,
                                   .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
-                                  .quiet_col = LiveCol(UiColMap::LoudnessMeterQuiet),
-                                  .good_col = LiveCol(UiColMap::LoudnessMeterGood),
-                                  .hot_col = LiveCol(UiColMap::LoudnessMeterHot),
-                                  .band_col = LiveCol(UiColMap::LoudnessMeterTargetBand),
-                                  .momentary_col = LiveCol(UiColMap::LoudnessMeterMomentaryMarker),
                               });
 
         constexpr f32 k_readout_font_size = k_font_body_size * 0.81f;

@@ -84,20 +84,15 @@ void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db
 struct DrawLoudnessMeterOptions {
     f32 short_term_lufs; // bar fill
     f32 momentary_lufs; // marker line
-    f32 target_min_lufs; // shaded band, and the extent of the good_col region of the fill
+    f32 target_min_lufs; // extent of the good-colour region of the fill
     f32 target_max_lufs;
-    f32 fade_lu = 6.0f; // distance beyond the target band over which good_col fades to quiet_col/hot_col
+    f32 fade_lu = 6.0f; // distance beyond the target band over which the good colour fades to quiet/hot
     f32 min_lufs = -44.0f;
     f32 max_lufs = -8.0f;
-    u32 quiet_col;
-    u32 good_col;
-    u32 hot_col;
-    u32 band_col;
-    u32 momentary_col;
 };
 
-// Single bar of short-term loudness with a momentary marker and a shaded target band. The fill is a
-// gradient: good_col within the band, fading to quiet_col below it and hot_col above it.
+// Single bar of short-term loudness with a momentary marker. The fill is a gradient: good within the target
+// band, fading to quiet below it and hot above it.
 void DrawLoudnessMeter(imgui::Context& imgui, Rect r, DrawLoudnessMeterOptions const& options);
 
 struct DrawVerticalSliderOptions {

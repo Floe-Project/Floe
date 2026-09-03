@@ -67,6 +67,7 @@
     X(RegisterParamTests)                                                                                    \
     X(RegisterPathPoolTests)                                                                                 \
     X(RegisterPathTests)                                                                                     \
+    X(RegisterPeakMeterTests)                                                                                \
     X(RegisterPersistentStoreTests)                                                                          \
     X(RegisterPerformanceProfileTests)                                                                       \
     X(RegisterPreferencesTests)                                                                              \

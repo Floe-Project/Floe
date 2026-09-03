@@ -63,11 +63,19 @@ void DrawKnob(imgui::Context& imgui, imgui::Id id, Rect r, f32 percent, DrawKnob
 struct DrawPeakMeterOptions {
     bool flash_when_clipping;
     bool show_db_markers = true;
+    bool show_min_max_markers = false; // Also draws markers at min_db and max_db.
+    f32 min_db = -60.0f;
+    f32 max_db = 10.0f;
+    f32 marker_interval_db = 12.0f;
     int gap_px = 2;
 
     // Draws a horizontal line across the channels at this level, e.g. a limiter threshold or ceiling.
     Optional<f32> marker_db {};
     u32 marker_col = 0; // 0 uses the default peak colour.
+
+    // If the true level is above this but would otherwise be below min_db (and so not drawn at all),
+    // draw a 1px sliver at the bottom of the meter to indicate there's still some signal present.
+    Optional<f32> low_signal_threshold_db {};
 };
 
 // Single downward bar from 0dB showing how much a limiter is currently attenuating.

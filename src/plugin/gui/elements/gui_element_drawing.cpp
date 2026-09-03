@@ -401,8 +401,8 @@ void DrawPeakMeter(imgui::Context& imgui,
     auto const total_w = (s32)Round(r.w);
     auto const total_h = (s32)Round(r.h);
 
-    constexpr f32 k_max_db = 10.0f;
-    constexpr f32 k_min_db = -60.0f;
+    auto const k_max_db = options.max_db;
+    auto const k_min_db = options.min_db;
 
     // All layout values as integer pixel offsets.
     auto const marker_w = (s32)WwToPixels(5.7f);
@@ -446,11 +446,13 @@ void DrawPeakMeter(imgui::Context& imgui,
                                      col);
         };
 
-        draw_marker(0, true);
-        draw_marker(-12, false);
-        draw_marker(-24, false);
-        draw_marker(-36, false);
-        draw_marker(-48, false);
+        for (f32 db = 0; db > k_min_db; db -= options.marker_interval_db)
+            draw_marker(db, db == 0);
+
+        if (options.show_min_max_markers) {
+            draw_marker(k_max_db, false);
+            draw_marker(k_min_db, false);
+        }
     }
 
     auto const snapshot = level->GetSnapshot();
@@ -464,8 +466,15 @@ void DrawPeakMeter(imgui::Context& imgui,
     auto const clamped_v = Max(v, f32x2(k_min_amp));
     auto const v_db = 20 * Log10(clamped_v);
     auto const v_perceived = Clamp<f32x2>(MapTo01Unchecked<f32x2>(v_db, k_min_db, k_max_db), 0, 1);
-    auto const level_y_l = total_h - (s32)(v_perceived[0] * (f32)total_h);
-    auto const level_y_r = total_h - (s32)(v_perceived[1] * (f32)total_h);
+    auto level_y_l = total_h - (s32)(v_perceived[0] * (f32)total_h);
+    auto level_y_r = total_h - (s32)(v_perceived[1] * (f32)total_h);
+
+    if (options.low_signal_threshold_db) {
+        auto const threshold = *options.low_signal_threshold_db;
+        auto const sliver_y = Max(0, total_h - 1);
+        if (v_db[0] > threshold) level_y_l = Min(level_y_l, sliver_y);
+        if (v_db[1] > threshold) level_y_r = Min(level_y_r, sliver_y);
+    }
 
     // Segment boundaries as integer y-offsets from origin.
     auto const top_seg_y = (s32)((1 - MapTo01(0.0f, k_min_db, k_max_db)) * (f32)total_h);
@@ -530,15 +539,16 @@ void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db
     auto const total_w = (s32)Round(r.w);
     auto const total_h = (s32)Round(r.h);
 
-    constexpr f32 k_max_reduction_db = 24.0f;
+    constexpr f32 k_max_reduction_db = 12.0f;
 
-    auto const marker_w = (s32)WwToPixels(5.7f);
-    auto const marker_pad = (s32)WwToPixels(1.8f);
-    auto const bar_x0 = origin_x + (f32)marker_w;
-    auto const bar_x1 = origin_x + (f32)(total_w - marker_w);
+    auto const meter_w = total_w;
+    constexpr auto k_channel_gap = 2; // matches DrawPeakMeterOptions::gap_px default
+    auto const chan_w = (meter_w - k_channel_gap) / 2;
+    auto const bar_x0 = origin_x + (f32)((meter_w - chan_w) / 2);
+    auto const bar_x1 = bar_x0 + (f32)chan_w;
 
     auto const rounding_full = WwToPixels(k_corner_rounding);
-    auto const small = (total_w - (2 * marker_w)) < (s32)(rounding_full * 2);
+    auto const small = chan_w < (s32)(rounding_full * 2);
     auto const rounding = small ? 0.0f : rounding_full;
     auto const saved_aa = imgui.draw_list->renderer.anti_aliased_shapes;
     if (small) imgui.draw_list->renderer.anti_aliased_shapes = false;
@@ -548,22 +558,6 @@ void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db
                                    f32x2 {bar_x1, origin_y + (f32)total_h},
                                    LiveCol(UiColMap::PeakMeterBack),
                                    rounding);
-
-    auto draw_marker = [&](f32 reduction_db, bool bold) {
-        auto const y = (s32)((reduction_db / k_max_reduction_db) * (f32)total_h);
-        auto const marker_col =
-            bold ? LiveCol(UiColMap::PeakMeterMarkersBold) : LiveCol(UiColMap::PeakMeterMarkers);
-        imgui.draw_list->AddLine(f32x2 {origin_x, origin_y + y},
-                                 f32x2 {origin_x + (marker_w - marker_pad), origin_y + y},
-                                 marker_col);
-        imgui.draw_list->AddLine(f32x2 {origin_x + total_w - (marker_w - marker_pad), origin_y + y},
-                                 f32x2 {origin_x + total_w, origin_y + y},
-                                 marker_col);
-    };
-    draw_marker(0, true);
-    draw_marker(6, false);
-    draw_marker(12, false);
-    draw_marker(18, false);
 
     auto const reduction_y = (s32)(Clamp(gain_reduction_db / k_max_reduction_db, 0.0f, 1.0f) * (f32)total_h);
     if (reduction_y > 0)

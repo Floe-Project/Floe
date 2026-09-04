@@ -156,6 +156,7 @@ enum : u8 {
     ReloadAllAudioState = 1 << (k_num_layers + 1),
     ConvolutionIRChanged = 1 << (k_num_layers + 2),
     ResetAudioProcessing = 1 << (k_num_layers + 3),
+    ResetLufsMeter = 1 << (k_num_layers + 4),
 };
 
 } // namespace audio_thread_inbox
@@ -225,6 +226,9 @@ struct AudioProcessor {
 
     StereoPeakMeter peak_meter = {};
     LufsMeter lufs_meter = {};
+    // Written by main-thread when the "show LUFS meter" preference changes. Read by audio-thread to skip
+    // LUFS computation when nothing displays it.
+    Atomic<bool> show_lufs_meter {false};
 
     SharedLayerParams shared_layer_params {};
     Bitset<k_num_layers> solo {};
@@ -338,6 +342,7 @@ bool SetParameterValue(AudioProcessor& processor, ParamIndex index, f32 value, P
 bool LayerIsSilent(AudioProcessor const& processor, u32 layer_index);
 
 void ResetAudioProcessing(AudioProcessor&);
+void ResetLufsMeter(AudioProcessor&);
 
 bool IsMidiCCLearnActive(AudioProcessor const& processor);
 void LearnMidiCC(AudioProcessor& processor, ParamIndex param);

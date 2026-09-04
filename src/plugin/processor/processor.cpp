@@ -1376,6 +1376,8 @@ static clap_process_status ProcessSubBlock(AudioProcessor& processor,
 
         if (flags & audio_thread_inbox::ResetAudioProcessing) AudioThreadReset(processor);
 
+        if (flags & audio_thread_inbox::ResetLufsMeter) processor.lufs_meter.Reset();
+
         for (auto const layer_index : Range(k_num_layers))
             if (flags & ((u32)audio_thread_inbox::LayerInstrumentChanged << layer_index))
                 layers_changed.Set(layer_index);
@@ -1638,17 +1640,19 @@ static clap_process_status ProcessSubBlock(AudioProcessor& processor,
             frame *= processor.whole_engine_volume_fade.GetFade();
         }
         processor.peak_meter.AddBuffer(output);
-        processor.lufs_meter.AddBuffer(output);
+        if (processor.show_lufs_meter.Load(LoadMemoryOrder::Relaxed)) processor.lufs_meter.AddBuffer(output);
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)
             l.peak_meter.Zero();
 
-        // Keep feeding the loudness windows so they slide down as silence goes by, but publish silence
-        // straight away: we're about to tell the host it can stop calling us, and a reading frozen at the
-        // last loud value would sit on the GUI until playing resumes.
-        processor.lufs_meter.AddBuffer(output);
-        processor.lufs_meter.Zero();
+        if (processor.show_lufs_meter.Load(LoadMemoryOrder::Relaxed)) {
+            // Keep feeding the loudness windows so they slide down as silence goes by, but publish silence
+            // straight away: we're about to tell the host it can stop calling us, and a reading frozen at
+            // the last loud value would sit on the GUI until playing resumes.
+            processor.lufs_meter.AddBuffer(output);
+            processor.lufs_meter.Zero();
+        }
 
         result = CLAP_PROCESS_SLEEP;
     }
@@ -1716,6 +1720,12 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
 void ResetAudioProcessing(AudioProcessor& processor) {
     ASSERT(g_is_logical_main_thread);
     processor.inbox_flags.FetchOr(audio_thread_inbox::ResetAudioProcessing, RmwMemoryOrder::Release);
+    processor.host.request_process(&processor.host);
+}
+
+void ResetLufsMeter(AudioProcessor& processor) {
+    ASSERT(g_is_logical_main_thread);
+    processor.inbox_flags.FetchOr(audio_thread_inbox::ResetLufsMeter, RmwMemoryOrder::Release);
     processor.host.request_process(&processor.host);
 }
 
@@ -1788,6 +1798,12 @@ AudioProcessor::AudioProcessor(clap_host const& host,
             param_learned_ccs[i].AssignBlockwise(profile.controls.param_learned_ccs[i]);
         performance_settings.Store(profile.controls.settings, StoreMemoryOrder::Relaxed);
     }
+
+    show_lufs_meter.Store(prefs::GetBool(prefs,
+                                         {.key = prefs::key::k_show_lufs_meter,
+                                          .value_requirements = prefs::ValueType::Bool,
+                                          .default_value = false}),
+                          StoreMemoryOrder::Relaxed);
 }
 
 AudioProcessor::~AudioProcessor() {

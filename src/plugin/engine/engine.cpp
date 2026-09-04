@@ -1039,6 +1039,17 @@ static void PluginOnPreferenceChanged(Engine& engine, prefs::Key key, prefs::Val
             }
         }
     }
+
+    if (auto const show_lufs_meter = prefs::MatchBool(key,
+                                                      value,
+                                                      {.key = prefs::key::k_show_lufs_meter,
+                                                       .value_requirements = prefs::ValueType::Bool,
+                                                       .default_value = false})) {
+        engine.processor.show_lufs_meter.Store(*show_lufs_meter, StoreMemoryOrder::Relaxed);
+        // Discard the stale reading from before metering was paused, so re-enabling doesn't briefly show
+        // a snapshot from whenever it was last on.
+        if (*show_lufs_meter) ResetLufsMeter(engine.processor);
+    }
 }
 
 usize MegabytesUsedBySamples(Engine const& engine) {

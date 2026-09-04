@@ -35,7 +35,7 @@ prefs::Descriptor SettingDescriptor(GuiPreference setting) {
             };
         case GuiPreference::ShowLufsMeter:
             return {
-                .key = "show-lufs-meter"_s,
+                .key = prefs::key::k_show_lufs_meter,
                 .value_requirements = prefs::ValueType::Bool,
                 .default_value = false,
                 .gui_label = "Show LUFS meter",

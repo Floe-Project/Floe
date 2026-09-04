@@ -19,6 +19,15 @@ LufsMeter::~LufsMeter() {
     }
 }
 
+void LufsMeter::InitEbur128() {
+    if (m_state) {
+        auto state = (ebur128_state*)m_state;
+        ebur128_destroy(&state);
+    }
+    m_state = ebur128_init(2, (unsigned long)m_sample_rate, EBUR128_MODE_S);
+    ASSERT(m_state);
+}
+
 void LufsMeter::PrepareToPlay(f32 sample_rate) {
     ASSERT_HOT(sample_rate > 0);
     if (sample_rate == m_sample_rate && m_state) return;
@@ -26,13 +35,15 @@ void LufsMeter::PrepareToPlay(f32 sample_rate) {
     m_query_interval_frames = (u32)(sample_rate * (k_query_interval_ms / 1000.0f));
     m_frames_since_last_query = 0;
 
-    if (m_state) {
-        auto state = (ebur128_state*)m_state;
-        ebur128_destroy(&state);
-    }
-    m_state = ebur128_init(2, (unsigned long)sample_rate, EBUR128_MODE_S);
-    ASSERT(m_state);
+    InitEbur128();
 
+    Zero();
+}
+
+void LufsMeter::Reset() {
+    ASSERT_HOT(m_state);
+    m_frames_since_last_query = 0;
+    InitEbur128();
     Zero();
 }
 

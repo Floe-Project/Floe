@@ -24,6 +24,12 @@ class LufsMeter {
     // [audio-thread]
     void AddBuffer(Span<f32x2> frames);
 
+    // Discards the accumulated loudness history, e.g. when resuming metering after it was paused: without
+    // this, stale momentary/short-term values would otherwise be reported until enough new audio has been
+    // processed to overwrite them.
+    // [audio-thread]
+    void Reset();
+
     // [audio-thread]
     void Zero() { m_snapshot.Store({}, StoreMemoryOrder::Relaxed); }
 
@@ -31,6 +37,8 @@ class LufsMeter {
     Snapshot GetSnapshot() const { return m_snapshot.Load(LoadMemoryOrder::Relaxed); }
 
   private:
+    void InitEbur128();
+
     void* m_state = nullptr; // ebur128_state*
     f32 m_sample_rate = 0;
     u32 m_query_interval_frames = 0;

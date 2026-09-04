@@ -491,9 +491,8 @@ void PresetBrowserItems(GuiBuilder& builder, PresetBrowserContext& context, Pres
                                                       &frame_context = context.frame_context]() -> String {
                         DynamicArray<char> buffer {scratch};
 
-                        fmt::Append(buffer, "{}", preset.name);
-                        if (preset.metadata.author.size)
-                            fmt::Append(buffer, " by {}.", preset.metadata.author);
+                        dyn::AppendSpan(buffer, "Click to load the preset."_s);
+
                         if (preset.metadata.description.size)
                             fmt::Append(buffer, "\n\n{}", preset.metadata.description);
 
@@ -530,6 +529,9 @@ void PresetBrowserItems(GuiBuilder& builder, PresetBrowserContext& context, Pres
                                 dyn::Pop(buffer, 2);
                             dyn::AppendSpan(buffer, ".");
                         }
+
+                        if (preset.metadata.author.size)
+                            fmt::Append(buffer, "\n\nAuthor: {}.", preset.metadata.author);
 
                         return buffer.ToOwnedSpan();
                     }),

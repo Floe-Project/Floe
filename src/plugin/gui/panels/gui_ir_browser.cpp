@@ -221,12 +221,12 @@ void IrBrowserItems(GuiBuilder& builder, IrBrowserContext& context, IrBrowserSta
                                   .tooltip = FunctionRef<String()>([&]() -> String {
                                       DynamicArray<char> buffer {builder.arena};
 
-                                      fmt::Append(buffer, "{}. ", ir.name);
+                                      dyn::AppendSpan(buffer, "Click to load the IR.");
 
                                       if (ir.description && ir.description->size)
-                                          fmt::Append(buffer, "\n{}\n", *ir.description);
+                                          fmt::Append(buffer, "\n\n{}", *ir.description);
 
-                                      dyn::AppendSpan(buffer, "Tags: ");
+                                      dyn::AppendSpan(buffer, "\n\nTags: ");
                                       if (ir.tags.AnyValuesSet()) {
                                           bool first = true;
                                           ir.tags.ForEachSetBit([&](usize bit) {
@@ -235,8 +235,10 @@ void IrBrowserItems(GuiBuilder& builder, IrBrowserContext& context, IrBrowserSta
                                               fmt::Append(buffer, "{}", GetTagInfo((TagType)bit).name);
                                           });
                                       } else {
-                                          dyn::AppendSpan(buffer, "none");
+                                          dyn::AppendSpan(buffer, "None");
                                       }
+
+                                      fmt::Append(buffer, "\n\nLibrary: {} by {}", lib.name, lib.author);
 
                                       return buffer.ToOwnedSpan();
                                   }),

@@ -1640,60 +1640,64 @@ static void DoBrowserLibraryFilters(GuiBuilder& builder,
 
                 if (section.Do(builder) == BrowserSection::State::Collapsed) break;
 
-                button = DoFilterCard(builder,
-                                      context.state,
-                                      lib_info,
-                                      FilterCardOptions {
-                                          .common =
-                                              {
-                                                  .parent = section.Do(builder).Get<Box>(),
-                                                  .id_extra = lib_hash,
-                                                  .is_selected = is_selected,
-                                                  .text = lib->name,
-                                                  .tooltip = FunctionRef<String()>([&]() -> String {
-                                                      auto lib = sample_lib_server::FindLibraryRetained(
-                                                          context.sample_library_server,
-                                                          lib_id);
-                                                      DEFER { lib.Release(); };
+                button = DoFilterCard(
+                    builder,
+                    context.state,
+                    lib_info,
+                    FilterCardOptions {
+                        .common =
+                            {
+                                .parent = section.Do(builder).Get<Box>(),
+                                .id_extra = lib_hash,
+                                .is_selected = is_selected,
+                                .text = lib->name,
+                                .tooltip = FunctionRef<String()>([&]() -> String {
+                                    auto lib =
+                                        sample_lib_server::FindLibraryRetained(context.sample_library_server,
+                                                                               lib_id);
+                                    DEFER { lib.Release(); };
 
-                                                      DynamicArray<char> buf {builder.arena};
-                                                      fmt::Append(buf, "{} by {}.", lib->name, lib->author);
-                                                      if (lib) {
-                                                          if (lib->description)
-                                                              fmt::Append(buf, "\n\n{}", lib->description);
-                                                      }
-                                                      return buf.ToOwnedSpan();
-                                                  }),
-                                                  .filter = context.state.Filter(BrowserFilter::Library),
-                                                  .clicked_key = lib_hash,
-                                                  .filter_mode = context.state.filter_mode,
-                                              },
-                                          .library_id = lib_id,
-                                          .library_images = library_filters.library_images,
-                                          .sample_library_server = context.sample_library_server,
-                                          .instance_index = library_filters.instance_index,
-                                          .subtext = ({
-                                              String s;
-                                              if (lib) s = builder.arena.Clone(lib->tagline);
-                                              s;
-                                          }),
-                                          .version = lib->revision,
-                                          .folder_infos = library_filters.folders,
-                                          .folder = folder,
-                                          .all_items_suffix = library_filters.resource_type ==
-                                                                      sample_lib::ResourceType::Instrument
-                                                                  ? " Instruments"_s
-                                                                  : " IRs"_s,
-                                          .default_collapsed = true,
-                                          .right_click_menu = lib_right_click_menu,
-                                          .store = &context.store,
-                                          .name = library_filters.card_name_prefix.size
-                                                      ? (String)fmt::Format(builder.arena,
-                                                                            "{}{}",
-                                                                            library_filters.card_name_prefix,
-                                                                            lib->name)
-                                                      : String {},
-                                      });
+                                    if (!lib) return ""_s;
+
+                                    DynamicArray<char> buf {builder.arena};
+                                    dyn::AppendSpan(buf, "Click to expand/collapse the library.");
+
+                                    if (lib->description) fmt::Append(buf, "\n\n{}", lib->description);
+
+                                    fmt::Append(buf, "\n\nAuthor: {}.", lib->author);
+
+                                    return buf.ToOwnedSpan();
+                                }),
+                                .filter = context.state.Filter(BrowserFilter::Library),
+                                .clicked_key = lib_hash,
+                                .filter_mode = context.state.filter_mode,
+                            },
+                        .library_id = lib_id,
+                        .library_images = library_filters.library_images,
+                        .sample_library_server = context.sample_library_server,
+                        .instance_index = library_filters.instance_index,
+                        .subtext = ({
+                            String s;
+                            if (lib) s = builder.arena.Clone(lib->tagline);
+                            s;
+                        }),
+                        .version = lib->revision,
+                        .folder_infos = library_filters.folders,
+                        .folder = folder,
+                        .all_items_suffix =
+                            library_filters.resource_type == sample_lib::ResourceType::Instrument
+                                ? " Instruments"_s
+                                : " IRs"_s,
+                        .default_collapsed = true,
+                        .right_click_menu = lib_right_click_menu,
+                        .store = &context.store,
+                        .name = library_filters.card_name_prefix.size
+                                    ? (String)fmt::Format(builder.arena,
+                                                          "{}{}",
+                                                          library_filters.card_name_prefix,
+                                                          lib->name)
+                                    : String {},
+                    });
             } else {
                 if (section.Do(builder) == BrowserSection::State::Collapsed) break;
 

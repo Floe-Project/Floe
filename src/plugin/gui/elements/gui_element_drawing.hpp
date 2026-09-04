@@ -69,6 +69,9 @@ struct DrawPeakMeterOptions {
     f32 marker_interval_db = 12.0f;
     int gap_px = 2;
 
+    // The warning-coloured region runs from this level up to 0dB.
+    f32 yellow_zone_min_db = -12.0f;
+
     // Draws a horizontal line across the channels at this level, e.g. a limiter threshold or ceiling.
     Optional<f32> marker_db {};
     u32 marker_col = 0; // 0 uses the default peak colour.
@@ -78,8 +81,14 @@ struct DrawPeakMeterOptions {
     Optional<f32> low_signal_threshold_db {};
 };
 
+struct DrawGainReductionMeterOptions {
+    f32 gain_reduction_db;
+    u32 col;
+    f32 max_reduction_db = 12.0f; // The reduction level at which the bar is full.
+};
+
 // Single downward bar from 0dB showing how much a limiter is currently attenuating.
-void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db, u32 col);
+void DrawGainReductionMeter(imgui::Context& imgui, Rect r, DrawGainReductionMeterOptions const& options);
 
 struct DrawLoudnessMeterOptions {
     f32 short_term_lufs; // bar fill

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "gui/core/gui_fwd.hpp"
+#include "gui/elements/gui_element_drawing.hpp"
 #include "gui_framework/gui_builder.hpp"
 
 namespace prefs {
@@ -16,6 +17,15 @@ struct TooltipOptions {
     TooltipJustification justification = TooltipJustification::AboveOrBelow;
 };
 bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, String str, TooltipOptions const& options);
+
+// Text builders for meter tooltips. Callers construct the same DrawXOptions struct they pass to the
+// corresponding Draw* function and pass it here too, so the drawn ranges and the tooltip text can never
+// disagree.
+String PeakMeterTooltipText(ArenaAllocator& arena,
+                            StereoPeakMeter const& level,
+                            DrawPeakMeterOptions const& options);
+String GainReductionMeterTooltipText(ArenaAllocator& arena, DrawGainReductionMeterOptions const& options);
+String LoudnessMeterTooltipText(ArenaAllocator& arena, DrawLoudnessMeterOptions const& options);
 
 constexpr f32 k_mid_button_height = 22.4f;
 

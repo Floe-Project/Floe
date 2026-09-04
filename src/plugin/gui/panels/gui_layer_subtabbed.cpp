@@ -605,23 +605,29 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
 
         // Peak meter
         auto const& layer_processor = g.engine.processor.layer_processors[layer_index];
+        auto const peak_meter_options = DrawPeakMeterOptions {
+            .flash_when_clipping = false,
+            .show_min_max_markers = true,
+            .min_db = -60,
+            .max_db = 12,
+        };
         auto const meter_box = DoBox(g.builder,
                                      {
                                          .parent = vol_col,
                                          .layout {
                                              .size = {k_peak_meter_standard_width, k_vol_slider_height},
                                          },
+                                         .tooltip = FunctionRef<String()> {[&]() -> String {
+                                             return PeakMeterTooltipText(g.builder.arena,
+                                                                         layer_processor.peak_meter,
+                                                                         peak_meter_options);
+                                         }},
                                      });
         if (auto const r = BoxRect(g.builder, meter_box))
             DrawPeakMeter(g.imgui,
                           g.imgui.ViewportRectToWindowRect(*r),
                           &layer_processor.peak_meter,
-                          {
-                              .flash_when_clipping = false,
-                              .show_min_max_markers = true,
-                              .min_db = -60,
-                              .max_db = 12,
-                          });
+                          peak_meter_options);
 
         // Volume slider
         {

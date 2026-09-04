@@ -425,7 +425,8 @@ void DrawPeakMeter(imgui::Context& imgui,
 
     // Segment boundaries as integer y-offsets from origin.
     auto const top_seg_y = (s32)((1 - MapTo01(0.0f, k_min_db, k_max_db)) * (f32)total_h);
-    auto const mid_seg_y = (s32)((1 - MapTo01(-12.0f, k_min_db, k_max_db)) * (f32)total_h);
+    auto const mid_seg_y =
+        (s32)((1 - MapTo01(options.yellow_zone_min_db, k_min_db, k_max_db)) * (f32)total_h);
 
     // Background channels. The region above 0dB gets a subtly brighter background to hint at the overload
     // range. The two regions are drawn adjacent (not overlaid) so the translucent background isn't
@@ -582,13 +583,11 @@ void DrawPeakMeter(imgui::Context& imgui,
     }
 }
 
-void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db, u32 col) {
+void DrawGainReductionMeter(imgui::Context& imgui, Rect r, DrawGainReductionMeterOptions const& options) {
     auto const origin_x = Round(r.x);
     auto const origin_y = Round(r.y);
     auto const total_w = (s32)Round(r.w);
     auto const total_h = (s32)Round(r.h);
-
-    constexpr f32 k_max_reduction_db = 12.0f;
 
     auto const meter_w = total_w;
     constexpr auto k_channel_gap = 2; // matches DrawPeakMeterOptions::gap_px default
@@ -608,11 +607,12 @@ void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db
                                    LiveCol(UiColMap::PeakMeterBack),
                                    rounding);
 
-    auto const reduction_y = (s32)(Clamp(gain_reduction_db / k_max_reduction_db, 0.0f, 1.0f) * (f32)total_h);
+    auto const reduction_y =
+        (s32)(Clamp(options.gain_reduction_db / options.max_reduction_db, 0.0f, 1.0f) * (f32)total_h);
     if (reduction_y > 0)
         imgui.draw_list->AddRectFilled(f32x2 {bar_x0, origin_y},
                                        f32x2 {bar_x1, origin_y + (f32)reduction_y},
-                                       col,
+                                       options.col,
                                        rounding,
                                        0b1100);
 }

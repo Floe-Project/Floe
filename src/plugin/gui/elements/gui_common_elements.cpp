@@ -104,6 +104,47 @@ Box DoMidPanelIconButton(GuiBuilder& builder, Box row, MidPanelIconButtonOptions
     return DoMidIconButton(builder, row, icon, options.tooltip, options.greyed_out, font_size, options.is_on);
 }
 
+static String FormatDbOrNegInf(ArenaAllocator& arena, f32 amp, f32 db) {
+    if (amp <= 0.0f) return "-∞"_s;
+    return fmt::Format(arena, "{.1}", db);
+}
+
+String PeakMeterTooltipText(ArenaAllocator& arena,
+                            StereoPeakMeter const& level,
+                            DrawPeakMeterOptions const& options) {
+    auto const raw = level.GetSnapshot().levels;
+    auto const db = 20 * Log10(Max(raw, f32x2 {0.0000000001f}));
+
+    DynamicArray<char> buf {arena};
+    fmt::Append(buf,
+                "{} | {} dB\n",
+                FormatDbOrNegInf(arena, raw[0], db[0]),
+                FormatDbOrNegInf(arena, raw[1], db[1]));
+    fmt::Append(buf, "Display range: {.0} to {.0} dB", options.min_db, options.max_db);
+    if (options.show_db_markers) fmt::Append(buf, "\nLines every: {.0} dB", options.marker_interval_db);
+    fmt::Append(buf, "\nYellow region: {.0} to {.0} dB", options.yellow_zone_min_db, 0.0f);
+
+    return buf.ToOwnedSpan();
+}
+
+String GainReductionMeterTooltipText(ArenaAllocator& arena, DrawGainReductionMeterOptions const& options) {
+    DynamicArray<char> buf {arena};
+    fmt::Append(buf, "{.1} dB reduction\n", options.gain_reduction_db);
+    fmt::Append(buf, "Range: {.0} to {.0} dB", 0.0f, options.max_reduction_db);
+
+    return buf.ToOwnedSpan();
+}
+
+String LoudnessMeterTooltipText(ArenaAllocator& arena, DrawLoudnessMeterOptions const& options) {
+    DynamicArray<char> buf {arena};
+    fmt::Append(buf, "{.1} | {.1} LUFS\n", options.momentary_lufs, options.short_term_lufs);
+    fmt::Append(buf, "Momentary | Short-term loudness\n");
+    fmt::Append(buf, "Range: {.0} to {.0} LUFS", options.min_lufs, options.max_lufs);
+    fmt::Append(buf, "\nGreen region: {.0} to {.0} LUFS", options.target_min_lufs, options.target_max_lufs);
+
+    return buf.ToOwnedSpan();
+}
+
 bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, String str, TooltipOptions const& options) {
     if (!options.ignore_show_tooltips_preference &&
         !prefs::GetBool(g.prefs, SettingDescriptor(GuiPreference::ShowTooltips)))

@@ -693,37 +693,47 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                  });
 
     // peak meter
-    if (auto const viewport_r =
-            BoxRect(builder,
-                    DoBox(builder,
-                          {
-                              .parent = meter_box,
-                              .layout {
-                                  .size = {k_peak_meter_standard_width, layout::k_fill_parent},
-                              },
-                          })))
-        DrawPeakMeter(g.imgui,
-                      builder.imgui.RegisterAndConvertRect(*viewport_r),
-                      &g.engine.processor.peak_meter,
-                      {
-                          .flash_when_clipping = true,
-                          .show_min_max_markers = true,
-                          .min_db = -36,
-                          .max_db = 6,
-                          .marker_interval_db = 6,
-                          .low_signal_threshold_db = -60.0f,
-                      });
+    {
+        auto const options = DrawPeakMeterOptions {
+            .flash_when_clipping = true,
+            .show_min_max_markers = true,
+            .min_db = -36,
+            .max_db = 6,
+            .marker_interval_db = 6,
+            .low_signal_threshold_db = -60.0f,
+        };
+        auto const peak_meter_box =
+            DoBox(builder,
+                  {
+                      .parent = meter_box,
+                      .layout {
+                          .size = {k_peak_meter_standard_width, layout::k_fill_parent},
+                      },
+                      .tooltip = FunctionRef<String()> {[&]() -> String {
+                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options);
+                      }},
+                  });
+        if (auto const viewport_r = BoxRect(builder, peak_meter_box))
+            DrawPeakMeter(g.imgui,
+                          builder.imgui.RegisterAndConvertRect(*viewport_r),
+                          &g.engine.processor.peak_meter,
+                          options);
+    }
 
     // loudness meter
     if (prefs::GetBool(g.engine.shared_engine_systems.prefs,
-                        SettingDescriptor(GuiPreference::ShowLufsMeter))) {
+                       SettingDescriptor(GuiPreference::ShowLufsMeter))) {
         constexpr f32 k_loudness_target_lufs = -22.0f;
         constexpr f32 k_loudness_target_tolerance_lu = 1.0f;
         constexpr f32 k_loudness_readout_width = 40;
 
         auto const snapshot = g.engine.processor.lufs_meter.GetSnapshot();
-        constexpr String k_tooltip =
-            "Loudness of the master output in LUFS: M is momentary (400ms), S is short-term (3s). The shaded band on the meter is a target to aim for so that your presets are of a similar loudness."_s;
+        auto const loudness_options = DrawLoudnessMeterOptions {
+            .short_term_lufs = snapshot.short_term_lufs,
+            .momentary_lufs = snapshot.momentary_lufs,
+            .target_min_lufs = k_loudness_target_lufs - k_loudness_target_tolerance_lu,
+            .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
+        };
 
         auto const container = DoBox(builder,
                                      {
@@ -733,7 +743,9 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                              .contents_gap = 4,
                                              .contents_direction = layout::Direction::Row,
                                          },
-                                         .tooltip = k_tooltip,
+                                         .tooltip = FunctionRef<String()> {[&]() -> String {
+                                             return LoudnessMeterTooltipText(builder.arena, loudness_options);
+                                         }},
                                      });
 
         if (auto const viewport_r = BoxRect(builder,
@@ -744,14 +756,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                                           .size = {11, layout::k_fill_parent},
                                                       },
                                                   })))
-            DrawLoudnessMeter(g.imgui,
-                              builder.imgui.RegisterAndConvertRect(*viewport_r),
-                              {
-                                  .short_term_lufs = snapshot.short_term_lufs,
-                                  .momentary_lufs = snapshot.momentary_lufs,
-                                  .target_min_lufs = k_loudness_target_lufs - k_loudness_target_tolerance_lu,
-                                  .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
-                              });
+            DrawLoudnessMeter(g.imgui, builder.imgui.RegisterAndConvertRect(*viewport_r), loudness_options);
 
         constexpr f32 k_readout_font_size = k_font_body_size * 0.81f;
 

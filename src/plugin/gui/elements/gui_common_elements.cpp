@@ -122,7 +122,8 @@ String PeakMeterTooltipText(ArenaAllocator& arena,
                 FormatDbOrNegInf(arena, raw[1], db[1]));
     fmt::Append(buf, "Display range: {.0} to {.0} dB", options.min_db, options.max_db);
     if (options.show_db_markers) fmt::Append(buf, "\nLines every: {.0} dB", options.marker_interval_db);
-    fmt::Append(buf, "\nYellow region: {.0} to {.0} dB", options.yellow_zone_min_db, 0.0f);
+    if (options.show_warning_zones)
+        fmt::Append(buf, "\nYellow region: {.0} to {.0} dB", options.yellow_zone_min_db, 0.0f);
 
     return buf.ToOwnedSpan();
 }

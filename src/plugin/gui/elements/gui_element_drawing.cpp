@@ -432,27 +432,42 @@ void DrawPeakMeter(imgui::Context& imgui,
     // range. The two regions are drawn adjacent (not overlaid) so the translucent background isn't
     // double-blended.
     auto const back_col = LiveCol(UiColMap::PeakMeterBack);
-    auto const top_back_col = ToU32({.c = Col::Black, .alpha = 44});
-    auto const split_y = Clamp(top_seg_y, 0, total_h);
-    for (auto const chan_index : Range(k_num_channels)) {
-        auto const cx = chan_xs[chan_index];
-        auto const x0 = origin_x + (f32)cx;
-        auto const x1 = origin_x + (f32)(cx + chan_w);
+    if (options.show_warning_zones) {
+        // The region above 0dB gets a subtly brighter background to hint at the overload range. The two
+        // regions are drawn adjacent (not overlaid) so the translucent background isn't double-blended.
+        auto const top_back_col = ToU32({.c = Col::Black, .alpha = 44});
+        auto const split_y = Clamp(top_seg_y, 0, total_h);
+        for (auto const chan_index : Range(k_num_channels)) {
+            auto const cx = chan_xs[chan_index];
+            auto const x0 = origin_x + (f32)cx;
+            auto const x1 = origin_x + (f32)(cx + chan_w);
 
-        // Above 0dB (rounded top corners).
-        if (split_y > 0)
+            // Above 0dB (rounded top corners).
+            if (split_y > 0)
+                imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y},
+                                               f32x2 {x1, origin_y + (f32)split_y},
+                                               top_back_col,
+                                               rounding,
+                                               0b1100);
+            // Below 0dB (rounded bottom corners).
+            if (split_y < total_h)
+                imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y + (f32)split_y},
+                                               f32x2 {x1, origin_y + (f32)total_h},
+                                               back_col,
+                                               rounding,
+                                               0b0011);
+        }
+    } else {
+        for (auto const chan_index : Range(k_num_channels)) {
+            auto const cx = chan_xs[chan_index];
+            auto const x0 = origin_x + (f32)cx;
+            auto const x1 = origin_x + (f32)(cx + chan_w);
             imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y},
-                                           f32x2 {x1, origin_y + (f32)split_y},
-                                           top_back_col,
-                                           rounding,
-                                           0b1100);
-        // Below 0dB (rounded bottom corners).
-        if (split_y < total_h)
-            imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y + (f32)split_y},
                                            f32x2 {x1, origin_y + (f32)total_h},
                                            back_col,
                                            rounding,
-                                           0b0011);
+                                           0b1111);
+        }
     }
 
     // dB markers.
@@ -514,6 +529,17 @@ void DrawPeakMeter(imgui::Context& imgui,
         auto const x0 = origin_x + (f32)cx;
         auto const x1 = origin_x + (f32)(cx + chan_w);
 
+        if (!options.show_warning_zones) {
+            auto col = LiveCol(UiColMap::PeakMeterHighlightBottom);
+            if (did_clip) col = LiveCol(UiColMap::PeakMeterClipping);
+            imgui.draw_list->AddRectFilled(f32x2 {x0, origin_y + ly},
+                                           f32x2 {x1, origin_y + (f32)total_h},
+                                           col,
+                                           rounding,
+                                           0b0011);
+            continue;
+        }
+
         // Top segment (above 0dB line).
         if (ly < top_seg_y) {
             auto col = LiveCol(UiColMap::PeakMeterHighlightTop);
@@ -557,10 +583,12 @@ void DrawPeakMeter(imgui::Context& imgui,
             auto const y = Clamp((f32)hold_y, 0.0f, (f32)total_h - hold_line_h);
 
             auto col = LiveCol(UiColMap::PeakMeterHighlightBottom);
-            if (hold_y < top_seg_y)
-                col = LiveCol(UiColMap::PeakMeterHighlightTop);
-            else if (hold_y < mid_seg_y)
-                col = LiveCol(UiColMap::PeakMeterHighlightMiddle);
+            if (options.show_warning_zones) {
+                if (hold_y < top_seg_y)
+                    col = LiveCol(UiColMap::PeakMeterHighlightTop);
+                else if (hold_y < mid_seg_y)
+                    col = LiveCol(UiColMap::PeakMeterHighlightMiddle);
+            }
             if (did_clip) col = LiveCol(UiColMap::PeakMeterClipping);
 
             auto const cx = chan_xs[chan_index];
@@ -777,8 +805,16 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui,
     fonts.Push(ToInt(FontType::Body));
     DEFER { fonts.Pop(); };
 
-    auto const max_width = WwToPixels(244.f);
     auto const text_margin = WwToPixels(k_tooltip_pad);
+
+    auto max_width = WwToPixels(k_tooltip_max_width);
+    if (args.justification == TooltipJustification::LeftOrRight) {
+        auto const viewport_width = GuiIo().in.window_size.ToFloat2().x;
+        auto const space_right = viewport_width - args.avoid_r.Right();
+        auto const space_left = args.avoid_r.x;
+        auto const available_width = Max(space_right, space_left) - (text_margin.x * 2);
+        max_width = Clamp(available_width, WwToPixels(k_tooltip_min_width), max_width);
+    }
 
     auto const wrapped_size = fonts.CalcTextSize(str, {.wrap_width = max_width});
 

@@ -610,6 +610,7 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
             .show_min_max_markers = true,
             .min_db = -60,
             .max_db = 12,
+            .show_warning_zones = false,
         };
         auto const meter_box = DoBox(g.builder,
                                      {

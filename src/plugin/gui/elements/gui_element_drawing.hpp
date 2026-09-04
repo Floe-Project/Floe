@@ -69,7 +69,12 @@ struct DrawPeakMeterOptions {
     f32 marker_interval_db = 12.0f;
     int gap_px = 2;
 
-    // The warning-coloured region runs from this level up to 0dB.
+    // If false, the meter is drawn in a single colour throughout, with no yellow/red warning zones or
+    // overload background tint. Use this where a hot reading doesn't itself indicate a problem, e.g. a
+    // per-layer meter measured before layers are summed and before any master effect runs.
+    bool show_warning_zones = true;
+
+    // The warning-coloured region runs from this level up to 0dB. Ignored if show_warning_zones is false.
     f32 yellow_zone_min_db = -12.0f;
 
     // Draws a horizontal line across the channels at this level, e.g. a limiter threshold or ceiling.

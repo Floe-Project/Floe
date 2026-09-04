@@ -414,6 +414,7 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                 .flash_when_clipping = false,
                 .show_db_markers = false,
                 .gap_px = 1,
+                .show_warning_zones = false,
             };
             auto const meter_box =
                 DoBox(builder,

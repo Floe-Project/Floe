@@ -633,9 +633,10 @@ struct Context {
     // Tooltip behaviour
     //
 
-    // Returns true if you should draw a tooltip for the given ID. Probably use overlay draw-list for drawing
-    // tooltips.
-    bool TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id);
+    // Returns the opacity that a tooltip for the given ID should be drawn with; 0 means don't draw one. The
+    // tooltip fades in after the mouse has rested on the element for a moment. Probably use overlay draw-list
+    // for drawing tooltips.
+    f32 TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id);
 
     //
     // Viewports

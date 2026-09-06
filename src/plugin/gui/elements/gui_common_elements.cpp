@@ -151,7 +151,7 @@ bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, String str, TooltipOption
         !prefs::GetBool(g.prefs, SettingDescriptor(GuiPreference::ShowTooltips)))
         return false;
 
-    if (g.imgui.TooltipBehaviour(window_r, id)) {
+    if (auto const opacity = g.imgui.TooltipBehaviour(window_r, id); opacity > 0) {
         DrawOverlayTooltipForRect(g.imgui,
                                   g.fonts,
                                   str,
@@ -159,6 +159,7 @@ bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, String str, TooltipOption
                                       .r = window_r,
                                       .avoid_r = options.avoid_r.ValueOr(window_r),
                                       .justification = options.justification,
+                                      .opacity = opacity,
                                   });
         return true;
     }

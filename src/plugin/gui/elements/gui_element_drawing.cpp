@@ -12,10 +12,14 @@
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 
-void DrawDropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt) {
+void DrawDropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt, f32 opacity) {
     auto const rounding = rounding_opt ? *rounding_opt : WwToPixels(k_corner_rounding);
     auto const blur = WwToPixels(7.84f);
-    imgui.draw_list->AddDropShadow(r.Min(), r.Max(), LiveCol(UiColMap::ViewportDropShadow), blur, rounding);
+    imgui.draw_list->AddDropShadow(r.Min(),
+                                   r.Max(),
+                                   ChangeAlpha(LiveCol(UiColMap::ViewportDropShadow), opacity),
+                                   blur,
+                                   rounding);
 }
 
 void DrawVoiceMarkerLine(imgui::Context const& imgui,
@@ -839,14 +843,14 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui,
                                           ? imgui::PopupJustification::LeftOrRight
                                           : imgui::PopupJustification::AboveOrBelow);
 
-    DrawDropShadow(imgui, popup_r);
+    DrawDropShadow(imgui, popup_r, k_nullopt, args.opacity);
 
     imgui.overlay_draw_list->AddRectFilled(popup_r,
-                                           ToU32(Col {.c = Col::Background0}),
+                                           ChangeAlpha(ToU32(Col {.c = Col::Background0}), args.opacity),
                                            WwToPixels(k_corner_rounding));
 
     imgui.overlay_draw_list->AddText(popup_r.pos + text_margin,
-                                     ToU32(Col {.c = Col::Text}),
+                                     ChangeAlpha(ToU32(Col {.c = Col::Text}), args.opacity),
                                      str,
                                      {.wrap_width = size + 1});
 }

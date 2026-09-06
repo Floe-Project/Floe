@@ -13,7 +13,7 @@
 
 // Drawing functions always need window coordinates, not viewport coordinates.
 
-void DrawDropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding = {});
+void DrawDropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding = {}, f32 opacity = 1);
 
 struct VoiceMarkerLineOptions {
     f32 opacity = 1;

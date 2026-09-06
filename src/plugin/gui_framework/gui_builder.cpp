@@ -179,7 +179,7 @@ static bool Tooltip(GuiBuilder& builder,
     if (!builder.config.show_tooltips) return false;
     if (tooltip_str.tag == TooltipStringType::None) return false;
 
-    if (builder.imgui.TooltipBehaviour(r, id)) {
+    if (auto const opacity = builder.imgui.TooltipBehaviour(r, id); opacity > 0) {
         auto const str = ({
             String s;
             switch (tooltip_str.tag) {
@@ -209,6 +209,7 @@ static bool Tooltip(GuiBuilder& builder,
                                         .r = r,
                                         .avoid_r = avoid_r,
                                         .justification = justification,
+                                        .opacity = opacity,
                                     });
 
         return true;
@@ -402,7 +403,7 @@ NO_UBSAN Box DoBox(GuiBuilder& builder, BoxConfig const& config, u64 loc_hash) {
                                           : k_auto_active_white_overlay;
                 }
 
-                if (config.drop_shadow) builder.config.draw_drop_shadow(builder.imgui, r, rounding);
+                if (config.drop_shadow) builder.config.draw_drop_shadow(builder.imgui, r, rounding, 1);
 
                 switch (config.background_shape) {
                     case BackgroundShape::Rectangle:

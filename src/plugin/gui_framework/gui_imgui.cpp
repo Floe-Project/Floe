@@ -2498,16 +2498,25 @@ Context::DraggerResult Context::DraggerBehaviour(DraggerBehaviourArgs const& arg
     return result;
 }
 
-bool Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
+f32 Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
     SetHot(rect_in_window_coords, id);
     RegisterRectForMouseTracking(rect_in_window_coords);
 
     constexpr auto k_delay_secs = 0.5;
+    constexpr auto k_fade_secs = 0.1;
 
     if (WasJustMadeHot(id))
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_delay_secs);
 
-    return IsHot(id) && SecondsSpentHot() >= k_delay_secs;
+    if (!IsHot(id)) return 0;
+
+    auto const seconds_visible = SecondsSpentHot() - k_delay_secs;
+    if (seconds_visible < 0) return 0;
+
+    auto const fade = (f32)Clamp(seconds_visible / k_fade_secs, 0.0, 1.0);
+    if (fade < 1) GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+
+    return 1 - ((1 - fade) * (1 - fade));
 }
 
 } // namespace imgui

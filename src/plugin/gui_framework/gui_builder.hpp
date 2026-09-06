@@ -117,12 +117,13 @@ struct DrawTooltipArgs {
     Rect r; // The rect that opened the tooltip.
     Rect avoid_r; // The rect to avoid when placing the tooltip;
     TooltipJustification justification;
+    f32 opacity = 1;
 };
 using DrawOverlayTooltipForRectFunc = void(imgui::Context const& imgui,
                                            Fonts& fonts,
                                            String str,
                                            DrawTooltipArgs const& args);
-using DrawDropShadowFunc = void(imgui::Context const& imgui, Rect r, Optional<f32> rounding);
+using DrawDropShadowFunc = void(imgui::Context const& imgui, Rect r, Optional<f32> rounding, f32 opacity);
 
 struct GuiBuilder {
     struct WordWrappedText {

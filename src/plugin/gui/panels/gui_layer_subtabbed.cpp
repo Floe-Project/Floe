@@ -2701,6 +2701,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                                        .tooltip = FunctionRef<String()> {[&]() -> String {
                                            return ParamTooltipText(param, g.builder.arena);
                                        }},
+                                       .tooltip_avoid_box = &cell,
                                        .button_behaviour = imgui::ButtonConfig {},
                                    });
 
@@ -2728,6 +2729,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                             .greyed_out = grey,
                             .label = false,
                             .allow_text_overflow = allow_text_overflow,
+                            .tooltip_avoid_box = &cell,
                         });
         do_label(cell, param.info.gui_label, grey, loc_hash);
     };
@@ -2838,6 +2840,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                       .corner_rounding = k_corner_rounding,
                       .layout {.size = {k_control_width, k_mid_button_height}},
                       .tooltip = "Rate set automatically by Auto Rate"_s,
+                      .tooltip_avoid_box = &cell,
                   });
             do_label(cell, "Rate"_s, secondary_greyed);
         } else {
@@ -2853,6 +2856,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                                .width = k_control_width,
                                .greyed_out = !edit.length,
                                .label = false,
+                               .tooltip_avoid_box = &cell,
                            });
             do_label(cell, "Length"_s, !edit.length);
         }
@@ -2869,6 +2873,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                                           .width = k_control_width,
                                           .greyed_out = secondary_greyed,
                                           .label = false,
+                                          .tooltip_avoid_box = &cell,
                                       });
             do_label(cell, "Humanise"_s, secondary_greyed);
         }
@@ -2897,6 +2902,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                                                .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
                                            },
                                            .tooltip = "Record a fixed note sequence by playing keys"_s,
+                                           .tooltip_avoid_box = &cell,
                                            .button_behaviour = imgui::ButtonConfig {},
                                        });
 

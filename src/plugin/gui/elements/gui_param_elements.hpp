@@ -43,6 +43,9 @@ struct MenuParameterComponentOptions {
     String override_tooltip {};
     String override_label {};
     String override_button_text {}; // If non-empty, shown on the button instead of the menu item text.
+    Box const* tooltip_avoid_box = nullptr; // Defaults to this widget's own container. Set it to a box that
+                                            // also encloses a caller-drawn label so the tooltip clears that
+                                            // too.
 };
 
 Box DoMenuParameter(GuiState& g,
@@ -73,6 +76,7 @@ struct IntParameterComponentOptions {
     bool label = true;
     String override_tooltip {};
     String override_label {};
+    Box const* tooltip_avoid_box = nullptr; // See MenuParameterComponentOptions::tooltip_avoid_box.
 };
 
 Box DoIntParameter(GuiState& g,
@@ -85,6 +89,7 @@ struct PercentDraggerOptions {
     bool greyed_out = false;
     bool label = true;
     String override_label {};
+    Box const* tooltip_avoid_box = nullptr; // See MenuParameterComponentOptions::tooltip_avoid_box.
 };
 
 Box DoPercentDraggerParameter(GuiState& g,

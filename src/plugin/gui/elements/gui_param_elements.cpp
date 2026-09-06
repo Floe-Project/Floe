@@ -555,6 +555,7 @@ Box DoMenuParameter(GuiState& g,
                 if (options.override_tooltip.size) return options.override_tooltip;
                 return ParamTooltipText(param, g.builder.arena);
             }},
+            .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
             .button_behaviour = imgui::ButtonConfig {},
         });
 
@@ -1212,6 +1213,7 @@ Box DoIntParameter(GuiState& g,
                       if (options.override_tooltip.size) return options.override_tooltip;
                       return ParamTooltipText(param, g.builder.arena);
                   }},
+                  .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
               });
 
     // Dragger behaviour.
@@ -1360,6 +1362,7 @@ Box DoPercentDraggerParameter(GuiState& g,
             },
             .tooltip =
                 FunctionRef<String()> {[&]() -> String { return ParamTooltipText(param, g.builder.arena); }},
+            .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
         });
 
     if (auto const viewport_r = BoxRect(g.builder, dragger_box)) {

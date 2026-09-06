@@ -548,6 +548,18 @@ NO_UBSAN Box DoBox(GuiBuilder& builder, BoxConfig const& config, u64 loc_hash) {
                     if (auto w = builder.imgui.FindViewport(config.tooltip_avoid_viewport_id))
                         additional_avoid_r = w->visible_bounds;
                 }
+                if (config.tooltip_avoid_box) {
+                    if (auto const avoid_box_r = BoxRect(builder, *config.tooltip_avoid_box)) {
+                        auto visible_avoid_box_r = builder.imgui.ViewportRectToWindowRect(*avoid_box_r);
+                        if (Rect::Intersection(visible_avoid_box_r,
+                                               builder.imgui.curr_viewport->visible_bounds)) {
+                            additional_avoid_r = additional_avoid_r
+                                                     ? Rect::MakeRectThatEnclosesRects(*additional_avoid_r,
+                                                                                       visible_avoid_box_r)
+                                                     : visible_avoid_box_r;
+                        }
+                    }
+                }
                 Tooltip(builder,
                         config.parent_dictates_hot_and_active ? config.parent->imgui_id : box.imgui_id,
                         rect,

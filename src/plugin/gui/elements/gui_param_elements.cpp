@@ -358,6 +358,7 @@ String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena,
     ASSERT(str);
 
     DynamicArray<char> buf {arena};
+    if (MacroIndexFromParamIndex(param.info.index)) dyn::AppendSpan(buf, "Macro "_s);
     fmt::Append(buf, "{}: {}\n", param.info.name, str.Value());
     if (greyed_out) fmt::Append(buf, "Not active. ");
     fmt::Append(buf, "{}", param.info.tooltip);
@@ -1514,6 +1515,8 @@ void ParameterValuePopup(GuiState& g, Span<DescribedParamValue const*> params, i
                                   else {
                                       DynamicArray<char> buf {g.scratch_arena};
                                       for (auto param : params) {
+                                          if (MacroIndexFromParamIndex(param->info.index))
+                                              dyn::AppendSpan(buf, "Macro "_s);
                                           fmt::Append(buf,
                                                       "{}: {}",
                                                       param->info.gui_label,
@@ -1548,6 +1551,7 @@ void DoParameterTooltipIfNeeded(GuiState& g,
         auto const str = param->info.LinearValueToString(param->LinearValue());
         ASSERT(str);
 
+        if (MacroIndexFromParamIndex(param->info.index)) dyn::AppendSpan(buf, "Macro "_s);
         fmt::Append(buf, "{}: {}\n{}", param->info.name, str.Value(), param->info.tooltip);
 
         if (param->info.value_type == ParamValueType::Int)

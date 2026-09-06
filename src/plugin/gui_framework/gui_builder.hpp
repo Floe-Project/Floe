@@ -269,6 +269,7 @@ struct BoxConfig {
 
     TooltipString tooltip = k_nullopt;
     imgui::Id tooltip_avoid_viewport_id = 0; // 0 = avoid nothing.
+    Box const* tooltip_avoid_box = nullptr; // Tooltip is placed outside the visible part of this box.
     TooltipJustification tooltip_justification = TooltipJustification::AboveOrBelow;
 
     Optional<imgui::ButtonConfig> button_behaviour = k_nullopt;

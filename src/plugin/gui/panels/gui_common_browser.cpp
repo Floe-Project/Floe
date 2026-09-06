@@ -1102,8 +1102,7 @@ Box DoFilterCard(GuiBuilder& builder,
                       .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                   },
                   .tooltip = options.common.tooltip,
-                  .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
-                  .tooltip_justification = TooltipJustification::LeftOrRight,
+                  .tooltip_avoid_box = &card_outer,
                   .button_behaviour = imgui::ButtonConfig {},
                   .name = options.name.size ? (String)fmt::Format(builder.arena, "{}.header", options.name)
                                             : String {},
@@ -1397,7 +1396,7 @@ BrowserSection::Result BrowserSection::Do(GuiBuilder& builder) {
                           .contents_align = layout::Alignment::Start,
                           .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                       },
-                      .tooltip = folder ? TooltipString {"Folder"_s} : k_nullopt,
+                      .tooltip = folder ? TooltipString {"Expand/collapse folder"_s} : k_nullopt,
                       .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
                       .tooltip_justification = TooltipJustification::LeftOrRight,
                       .button_behaviour = imgui::ButtonConfig {},
@@ -1664,7 +1663,7 @@ static void DoBrowserLibraryFilters(GuiBuilder& builder,
 
                                     if (lib->description) fmt::Append(buf, "\n\n{}", lib->description);
 
-                                    fmt::Append(buf, "\n\nAuthor: {}.", lib->author);
+                                    fmt::Append(buf, "\n\n{} is a library by {}.", lib->name, lib->author);
 
                                     return buf.ToOwnedSpan();
                                 }),

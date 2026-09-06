@@ -908,8 +908,16 @@ void DoPresetBrowser(GuiBuilder& builder, PresetBrowserContext& context, PresetB
                                         .is_selected = state.common_state.Filter(BrowserFilter::Folder)
                                                            .Contains(folder_hash),
                                         .text = folder_name,
-                                        .tooltip = folder->display_name.size ? TooltipString {folder->name}
-                                                                             : k_nullopt,
+                                        .tooltip = TooltipString {FunctionRef<String()>(
+                                            [folder, &folder_name, &scratch = builder.arena]() -> String {
+                                                DynamicArray<char> buffer {scratch};
+                                                dyn::AppendSpan(
+                                                    buffer,
+                                                    "Click to expand/collapse the preset bank."_s);
+                                                if (folder->name != folder_name)
+                                                    fmt::Append(buffer, "\n\n{}", folder->name);
+                                                return buffer.ToOwnedSpan();
+                                            })},
                                         .filter = state.common_state.Filter(BrowserFilter::Folder),
                                         .clicked_key = folder_hash,
                                         .filter_mode = state.common_state.filter_mode,

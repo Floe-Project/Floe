@@ -332,9 +332,12 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 ParameterJustStoppedMoving(g.engine.processor, p);
 
         if (tooltip_param) {
+            // Place tooltips clear of the whole waveform rather than just the grabber, so they never cover
+            // the waveform you're editing.
+            auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
             auto param_obj = g.engine.processor.main_params.DescribedValue(*tooltip_param);
-            ParameterValuePopup(g, param_obj, id, grabber_r);
-            DoParameterTooltipIfNeeded(g, param_obj, id, grabber_r);
+            ParameterValuePopup(g, param_obj, id, grabber_r, avoid_r);
+            DoParameterTooltipIfNeeded(g, param_obj, id, grabber_r, avoid_r);
         }
     };
 

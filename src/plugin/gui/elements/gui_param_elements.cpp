@@ -1497,12 +1497,20 @@ void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const
     }
 }
 
-void ParameterValuePopup(GuiState& g, DescribedParamValue const& param, imgui::Id id, Rect window_r) {
+void ParameterValuePopup(GuiState& g,
+                         DescribedParamValue const& param,
+                         imgui::Id id,
+                         Rect window_r,
+                         Optional<Rect> avoid_r) {
     auto param_ptr = &param;
-    ParameterValuePopup(g, {&param_ptr, 1}, id, window_r);
+    ParameterValuePopup(g, {&param_ptr, 1}, id, window_r, avoid_r);
 }
 
-void ParameterValuePopup(GuiState& g, Span<DescribedParamValue const*> params, imgui::Id id, Rect window_r) {
+void ParameterValuePopup(GuiState& g,
+                         Span<DescribedParamValue const*> params,
+                         imgui::Id id,
+                         Rect window_r,
+                         Optional<Rect> avoid_r) {
     if (!g.imgui.IsActive(id, MouseButton::Left)) return;
 
     DrawOverlayTooltipForRect(g.imgui,
@@ -1529,7 +1537,7 @@ void ParameterValuePopup(GuiState& g, Span<DescribedParamValue const*> params, i
                               }),
                               {
                                   .r = window_r,
-                                  .avoid_r = window_r,
+                                  .avoid_r = avoid_r.ValueOr(window_r),
                                   .justification = TooltipJustification::AboveOrBelow,
                               });
 }
@@ -1537,15 +1545,17 @@ void ParameterValuePopup(GuiState& g, Span<DescribedParamValue const*> params, i
 void DoParameterTooltipIfNeeded(GuiState& g,
                                 DescribedParamValue const& param,
                                 imgui::Id imgui_id,
-                                Rect param_rect_in_window_coords) {
+                                Rect param_rect_in_window_coords,
+                                Optional<Rect> avoid_r) {
     auto param_ptr = &param;
-    DoParameterTooltipIfNeeded(g, {&param_ptr, 1}, imgui_id, param_rect_in_window_coords);
+    DoParameterTooltipIfNeeded(g, {&param_ptr, 1}, imgui_id, param_rect_in_window_coords, avoid_r);
 }
 
 void DoParameterTooltipIfNeeded(GuiState& g,
                                 Span<DescribedParamValue const*> params,
                                 imgui::Id imgui_id,
-                                Rect param_rect_in_window_coords) {
+                                Rect param_rect_in_window_coords,
+                                Optional<Rect> avoid_r) {
     DynamicArray<char> buf {g.scratch_arena};
     for (auto param : params) {
         auto const str = param->info.LinearValueToString(param->LinearValue());
@@ -1559,5 +1569,5 @@ void DoParameterTooltipIfNeeded(GuiState& g,
 
         if (params.size != 1 && param != Last(params)) fmt::Append(buf, "\n\n");
     }
-    Tooltip(g, imgui_id, param_rect_in_window_coords, buf, {});
+    Tooltip(g, imgui_id, param_rect_in_window_coords, buf, {.avoid_r = avoid_r});
 }

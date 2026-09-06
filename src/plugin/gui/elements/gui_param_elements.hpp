@@ -151,13 +151,24 @@ void AddParamContextMenuBehaviour(GuiState& g, Box const& box, DescribedParamVal
 
 void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const> params);
 
+// avoid_r: region the tooltip is placed outside of. If nullopt, uses window_r.
 void DoParameterTooltipIfNeeded(GuiState& g,
                                 DescribedParamValue const& param,
                                 imgui::Id imgui_id,
-                                Rect window_r);
+                                Rect window_r,
+                                Optional<Rect> avoid_r = k_nullopt);
 void DoParameterTooltipIfNeeded(GuiState& g,
                                 Span<DescribedParamValue const*> param,
                                 imgui::Id imgui_id,
-                                Rect window_r);
-void ParameterValuePopup(GuiState& g, DescribedParamValue const& param, imgui::Id id, Rect window_r);
-void ParameterValuePopup(GuiState& g, Span<DescribedParamValue const*> params, imgui::Id id, Rect window_r);
+                                Rect window_r,
+                                Optional<Rect> avoid_r = k_nullopt);
+void ParameterValuePopup(GuiState& g,
+                         DescribedParamValue const& param,
+                         imgui::Id id,
+                         Rect window_r,
+                         Optional<Rect> avoid_r = k_nullopt);
+void ParameterValuePopup(GuiState& g,
+                         Span<DescribedParamValue const*> params,
+                         imgui::Id id,
+                         Rect window_r,
+                         Optional<Rect> avoid_r = k_nullopt);

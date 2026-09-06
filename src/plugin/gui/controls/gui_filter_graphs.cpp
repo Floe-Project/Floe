@@ -104,13 +104,18 @@ struct GrabberDrawOptions {
     f32 handle_radius;
     imgui::Id interaction_id;
     Rect grabber_window_r;
+    Rect graph_viewport_r; // The popup is placed outside of this.
     Span<DescribedParamValue const*> popup_params;
     bool greyed_out;
     CursorType active_cursor;
 };
 
 static void DrawGrabberHandleAndPopup(GuiState& g, GrabberDrawOptions const& opt) {
-    ParameterValuePopup(g, opt.popup_params, opt.interaction_id, opt.grabber_window_r);
+    ParameterValuePopup(g,
+                        opt.popup_params,
+                        opt.interaction_id,
+                        opt.grabber_window_r,
+                        g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r));
     filter_graph_draw::DrawHandle(g.imgui,
                                   g.imgui.ViewportPosToWindowPos(opt.node_pos_viewport),
                                   opt.handle_radius,
@@ -365,6 +370,7 @@ void DoFilterGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out
                                   .handle_radius = handle_radius,
                                   .interaction_id = interaction_id,
                                   .grabber_window_r = grabber_window_r,
+                                  .graph_viewport_r = viewport_r,
                                   .popup_params = popup_params,
                                   .greyed_out = greyed_out,
                                   .active_cursor = CursorType::HorizontalArrows,
@@ -567,6 +573,7 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
             .handle_radius = handle_radius,
             .interaction_id = interaction_id,
             .grabber_window_r = grabber_window_r,
+            .graph_viewport_r = viewport_r,
             .popup_params = popup_params,
             .greyed_out = greyed_out,
             .active_cursor = uses_gain ? CursorType::AllArrows : CursorType::HorizontalArrows,
@@ -699,6 +706,7 @@ void DoReverbPreFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                                       .handle_radius = handle_radius,
                                       .interaction_id = gr.interaction_id,
                                       .grabber_window_r = gr.window_r,
+                                      .graph_viewport_r = viewport_r,
                                       .popup_params = popup_params,
                                       .greyed_out = greyed_out,
                                       .active_cursor = CursorType::HorizontalArrows,
@@ -824,6 +832,7 @@ void DoReverbPostShelfGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                                       .handle_radius = handle_radius,
                                       .interaction_id = sh.interaction_id,
                                       .grabber_window_r = sh.window_r,
+                                      .graph_viewport_r = viewport_r,
                                       .popup_params = popup_params,
                                       .greyed_out = greyed_out,
                                       .active_cursor = CursorType::AllArrows,
@@ -913,6 +922,7 @@ void DoConvolutionReverbHighpassGraph(GuiState& g, Rect viewport_r, bool greyed_
                                   .handle_radius = handle_radius,
                                   .interaction_id = interaction_id,
                                   .grabber_window_r = grabber_window_r,
+                                  .graph_viewport_r = viewport_r,
                                   .popup_params = popup_params,
                                   .greyed_out = greyed_out,
                                   .active_cursor = CursorType::HorizontalArrows,
@@ -1007,6 +1017,7 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                                   .handle_radius = handle_radius,
                                   .interaction_id = interaction_id,
                                   .grabber_window_r = grabber_window_r,
+                                  .graph_viewport_r = viewport_r,
                                   .popup_params = popup_params,
                                   .greyed_out = greyed_out,
                                   .active_cursor = CursorType::AllArrows,
@@ -1312,6 +1323,7 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
                 .handle_radius = handle_radius,
                 .interaction_id = b.interaction_id,
                 .grabber_window_r = b.window_r,
+                .graph_viewport_r = viewport_r,
                 .popup_params = popup_params,
                 .greyed_out = greyed_out,
                 .active_cursor = b.uses_gain ? CursorType::AllArrows : CursorType::HorizontalArrows,

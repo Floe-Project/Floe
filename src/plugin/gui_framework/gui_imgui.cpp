@@ -1797,12 +1797,12 @@ bool Context::ButtonBehaviour(Rect r, Id id, ButtonConfig cfg) {
     });
 
     if (cfg.hold_to_repeat) {
-        if (WasJustActivated(id, cfg.mouse_button))
+        auto const wakeup_id = SourceLocationHash();
+        if (WasJustActivated(id, cfg.mouse_button)) {
             button_repeat_counter = GuiIo().in.current_time + k_button_repeat_initial_delay;
-        else if (is_active) {
-            if (GuiIo().WakeupAtTimedInterval(button_repeat_counter,
-                                              k_button_repeat_rate,
-                                              SourceLocationHash()))
+            GuiIo().out.SetTimedWakeup(wakeup_id, button_repeat_counter);
+        } else if (is_active) {
+            if (GuiIo().WakeupAtTimedInterval(button_repeat_counter, k_button_repeat_rate, wakeup_id))
                 button_fired = true;
         }
     }

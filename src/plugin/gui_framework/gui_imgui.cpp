@@ -453,17 +453,56 @@ static ScrollbarResult Scrollbar(Context& im,
     f32 handle_rel_y = handle_range == 0 ? 0 : (y_scroll_value / y_scroll_max) * handle_range;
 
     if (handle_range != 0) {
-        ButtonConfig const button_cfg {.mouse_button = MouseButton::Left,
-                                       .event = MouseButtonEvent::Down,
-                                       .is_non_viewport_content = true};
         static f32 cached_grab_offset {};
-        auto const handle_rect = oriented({.xywh = {x, track_y + handle_rel_y, w, handle_h}});
-        if (im.ButtonBehaviour(handle_rect, id, button_cfg))
-            cached_grab_offset = cursor_y - (track_y + handle_rel_y);
 
-        if (im.IsActive(id, MouseButton::Left)) {
-            handle_rel_y = Clamp((cursor_y - cached_grab_offset) - track_y, 0.0f, handle_range);
-            y_scroll_value = Round(Map(handle_rel_y, 0, handle_range, 0, 1) * y_scroll_max);
+        auto const scroll_value_for_handle = [&](f32 rel_y) {
+            return Round(Map(Clamp(rel_y, 0.0f, handle_range), 0, handle_range, 0, 1) * y_scroll_max);
+        };
+
+        // Track: clicking pages towards the cursor, repeating while held until the handle reaches the
+        // cursor. Shift-click (or Option-click) jumps straight to the cursor and grabs the handle.
+        {
+            ButtonConfig const track_cfg {.mouse_button = MouseButton::Left,
+                                          .event = MouseButtonEvent::Down,
+                                          .cursor_type = CursorType::Default,
+                                          .hold_to_repeat = true,
+                                          .is_non_viewport_content = true};
+            auto const track_id = im.MakeId(is_vertical ? "VertTrack" : "HorzTrack");
+            if (im.ButtonBehaviour(oriented({.xywh = {x, track_y, w, track_h}}), track_id, track_cfg)) {
+                auto const& press = GuiIo().in.Mouse(MouseButton::Left).is_down;
+                auto const jump_to_cursor = press && (press->modifiers.Get(ModifierKey::Shift) ||
+                                                      press->modifiers.Get(ModifierKey::Alt));
+
+                if (jump_to_cursor) {
+                    cached_grab_offset = handle_h / 2;
+                    handle_rel_y = Clamp((cursor_y - cached_grab_offset) - track_y, 0.0f, handle_range);
+                    y_scroll_value = scroll_value_for_handle(handle_rel_y);
+                    im.SetActive(id, MouseButton::Left);
+                } else {
+                    auto const handle_top = track_y + handle_rel_y;
+                    auto const page = viewport_h;
+                    if (cursor_y < handle_top)
+                        y_scroll_value = Round(Max(0.0f, y_scroll_value - page));
+                    else if (cursor_y > handle_top + handle_h)
+                        y_scroll_value = Round(Min(y_scroll_max, y_scroll_value + page));
+                    handle_rel_y = (y_scroll_value / y_scroll_max) * handle_range;
+                }
+            }
+        }
+
+        // Handle: runs after the track so that it wins the hot state when the cursor is over it.
+        {
+            ButtonConfig const handle_cfg {.mouse_button = MouseButton::Left,
+                                           .event = MouseButtonEvent::Down,
+                                           .is_non_viewport_content = true};
+            auto const handle_rect = oriented({.xywh = {x, track_y + handle_rel_y, w, handle_h}});
+            if (im.ButtonBehaviour(handle_rect, id, handle_cfg))
+                cached_grab_offset = cursor_y - (track_y + handle_rel_y);
+
+            if (im.IsActive(id, MouseButton::Left)) {
+                handle_rel_y = Clamp((cursor_y - cached_grab_offset) - track_y, 0.0f, handle_range);
+                y_scroll_value = scroll_value_for_handle(handle_rel_y);
+            }
         }
     }
 

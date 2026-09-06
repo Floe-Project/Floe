@@ -42,6 +42,14 @@ void DoArpStepSequencer(GuiState& g,
     // Global "dim" for visuals. True when the arp is off so step controls read as inactive.
     auto const dim = [&](u32 col) -> u32 { return snapshot.on ? col : WithAlphaU8(col, 60); };
 
+    auto const uses_fractional_velocity =
+        g.engine.processor.uses_fractional_velocity_values.Load(LoadMemoryOrder::Relaxed);
+    auto const velocity_string = [&](f32 velocity_01) -> String {
+        return uses_fractional_velocity
+                   ? fmt::Format(g.scratch_arena, "{.1}%", velocity_01 * 100.0f)
+                   : fmt::Format(g.scratch_arena, "{}", RoundPositiveFloat(velocity_01 * 127.0f));
+    };
+
     // Background drawn on the parent viewport, so corner rounding covers the whole widget.
     imgui.draw_list->AddRectFilled(rect, LiveCol(UiColMap::EnvelopeBack), WwToPixels(k_corner_rounding));
 
@@ -134,6 +142,16 @@ void DoArpStepSequencer(GuiState& g,
     // Velocity drag + tooltip. Always interactive — edit.step_velocity only controls visual dimming
     // via anything_editable, not interactivity.
     {
+        auto const& io = GuiIo().in;
+        auto const pos_to_step = [&](f32 x) {
+            return Clamp((x - bar_rect.x) / step_stride, 0.0f, (f32)active_steps - 1.0f);
+        };
+        auto const tie_root = [&](u32 step_index) {
+            while (step_index > 0 && snapshot.StepAt(step_index).tie)
+                --step_index;
+            return step_index;
+        };
+
         // fired captures the mouse-down on the same frame; IsActive only goes true the frame after.
         auto const fired = imgui.ButtonBehaviour(bar_rect,
                                                  bar_id,
@@ -146,17 +164,13 @@ void DoArpStepSequencer(GuiState& g,
         if (imgui.WasJustDeactivated(bar_id, MouseButton::Left)) EndUndoableStep(g.engine);
 
         if (fired || imgui.IsActive(bar_id, MouseButton::Left)) {
-            auto const& io = GuiIo().in;
-            auto const pos_to_step = [&](f32 x) {
-                return Clamp((x - bar_rect.x) / step_stride, 0.0f, (f32)active_steps - 1.0f);
-            };
             auto const y_to_vel = [&](f32 y) {
                 return Clamp(1.0f - ((y - bar_rect.y) / bar_area_height), 0.0f, 1.0f);
             };
             auto const set_vel_at = [&](u32 step_index, f32 vel) {
-                while (step_index > 0 && snapshot.StepAt(step_index).tie)
-                    --step_index;
-                ModifyStep(arp_state, step_index, [vel](ArpStep& s) { s.velocity = ArpStep::From01(vel); });
+                ModifyStep(arp_state, tie_root(step_index), [vel](ArpStep& s) {
+                    s.velocity = ArpStep::From01(vel);
+                });
             };
 
             auto const curr_sf = pos_to_step(io.cursor_pos.x);
@@ -180,11 +194,39 @@ void DoArpStepSequencer(GuiState& g,
             }
         }
 
+        // Value readout for the step under the cursor: an overlay while dragging, and part of the
+        // tooltip text on hover. Read live from arp_state so a drag doesn't lag a frame behind.
+        auto const cursor_step = tie_root((u32)pos_to_step(io.cursor_pos.x));
+        auto const velocity_str =
+            velocity_string(arp_state.steps[cursor_step].Load(LoadMemoryOrder::Relaxed).Velocity01());
+
+        if (imgui.IsActive(bar_id, MouseButton::Left)) {
+            auto const cursor_step_rect = imgui.ViewportRectToWindowRect({
+                .x = (f32)cursor_step * step_stride,
+                .y = 0,
+                .w = step_width,
+                .h = bar_area_height,
+            });
+            DrawOverlayTooltipForRect(
+                imgui,
+                g.fonts,
+                fmt::Format(g.scratch_arena, "Step {} velocity: {}", cursor_step + 1, velocity_str),
+                {
+                    .r = cursor_step_rect,
+                    .avoid_r = bar_rect,
+                    .justification = TooltipJustification::AboveOrBelow,
+                });
+        }
+
         Tooltip(
             g,
             bar_id,
             bar_rect,
-            "Step velocity. Click and drag to set. How velocity translates to volume is shaped by the curve on the CONFIG tab. Right-click for more options"_s,
+            fmt::Format(
+                g.scratch_arena,
+                "Step {} velocity: {}\nClick and drag to set. How velocity translates to volume is shaped by the curve on the CONFIG tab. Right-click for more options",
+                cursor_step + 1,
+                velocity_str),
             {});
     }
 
@@ -596,9 +638,12 @@ void DoArpStepSequencer(GuiState& g,
                 g,
                 note_id,
                 note_click_rect,
-                is_fixed
-                    ? "Note played at this step. Drag to change, double-click to type a note name"_s
-                    : "Pitch offset from the incoming note, in semitones. Drag to change, double-click to type a value"_s,
+                fmt::Format(
+                    g.scratch_arena,
+                    is_fixed
+                        ? "Note: {}\nNote played at this step. Drag to change, double-click to type a note name"_s
+                        : "Pitch offset: {}\nOffset from the incoming note, in semitones. Drag to change, double-click to type a value"_s,
+                    note_str),
                 {});
 
             auto const note_col = dim(note_hot   ? LiveCol(UiColMap::MidTextHot)
@@ -751,11 +796,27 @@ void DoArpStepSequencer(GuiState& g,
                 gate_text_input_result = dragger_result.text_input_result;
 
                 knob_hot = imgui.IsHotOrActive(knob_id, MouseButton::Left);
+
+                auto const gate_display = fmt::Format(g.scratch_arena, "{}%", (int)Round(gate_pct));
+                if (imgui.IsActive(knob_id, MouseButton::Left))
+                    DrawOverlayTooltipForRect(
+                        imgui,
+                        g.fonts,
+                        fmt::Format(g.scratch_arena, "Step {} gate: {}", i + 1, gate_display),
+                        {
+                            .r = knob_rect,
+                            .avoid_r = knob_rect,
+                            .justification = TooltipJustification::AboveOrBelow,
+                        });
+
                 Tooltip(
                     g,
                     knob_id,
                     knob_rect,
-                    "Gate: note length as a percentage of the step. 100% is legato, lower values are staccato. Drag to change, double-click to type a value"_s,
+                    fmt::Format(
+                        g.scratch_arena,
+                        "Gate: {}\nNote length as a percentage of the step. 100% is legato, lower values are staccato. Drag to change, double-click to type a value",
+                        gate_display),
                     {});
                 imgui.PopId();
             }

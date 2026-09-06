@@ -19,6 +19,10 @@ constexpr Id k_no_op_id = 1;
 // Viewport ID of the full size root viewport created when the IMGUI system begins.
 constexpr Id k_root_viewport_id = 4;
 
+// Viewports scissor to their bounds grown by this much, so that edge pixels of content aren't shaved off by
+// rounding. It's a drawing tolerance only - hit testing must use the un-grown rect.
+constexpr f32 k_clipping_expansion = 1.0f;
+
 constexpr f64 k_popup_open_and_close_delay_sec {0.1};
 static constexpr f64 k_text_cursor_blink_rate {0.5};
 static constexpr f64 k_button_repeat_initial_delay {0.4};
@@ -759,7 +763,8 @@ void Context::BeginFrame(ViewportConfig cfg, Fonts& fonts) {
     for (usize i = sorted_viewports.size; i-- > 0;) {
         auto viewport = sorted_viewports[i];
         if (viewport->visible_bounds.Contains(frame_input.cursor_pos)) {
-            if (viewport->clipping_rect.Contains(frame_input.cursor_pos)) hovered_viewport_content = viewport;
+            if (viewport->clipping_rect.Reduced(k_clipping_expansion).Contains(frame_input.cursor_pos))
+                hovered_viewport_content = viewport;
             hovered_viewport = viewport;
             break;
         }
@@ -2028,7 +2033,6 @@ void Context::BeginViewport(ViewportConfig const& cfg, Viewport* viewport, Rect 
         viewport->bounds.pos += f32x2 {viewport->cfg.padding.l, viewport->cfg.padding.t};
         viewport->bounds.size -= viewport->cfg.TotalPadSize();
     }
-    auto constexpr k_clipping_expansion = 1.0f;
     viewport->clipping_rect = viewport->bounds.Expanded(k_clipping_expansion);
 
     //

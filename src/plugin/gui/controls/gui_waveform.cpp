@@ -463,7 +463,9 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
             loop_region_r = Rect::FromMinMax({r.x + Min(loop_start_pos, loop_end_pos), r.y},
                                              {r.x + Max(loop_start_pos, loop_end_pos), r.Bottom()});
 
-            if (!single_builtin_loop && !(loop_start == 0 && loop_end == 1)) {
+            auto const region_draggable = !single_builtin_loop && !(loop_start == 0 && loop_end == 1);
+
+            if (region_draggable) {
                 do_handle_slider(loop_region_id,
                                  Array {start_param_id, end_param_id, xfade_param_id},
                                  {},
@@ -486,6 +488,30 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                                  });
             }
             loop_region_r = g.imgui.RegisterAndConvertRect(loop_region_r);
+
+            if (region_draggable) {
+                auto const start_param = g.engine.processor.main_params.DescribedValue(start_param_id);
+                auto const end_param = g.engine.processor.main_params.DescribedValue(end_param_id);
+                auto const xfade_param = g.engine.processor.main_params.DescribedValue(xfade_param_id);
+                DescribedParamValue const* param_ptrs[] = {&start_param, &end_param, &xfade_param};
+
+                auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
+                ParameterValuePopup(g, param_ptrs, loop_region_id, loop_region_r, avoid_r);
+
+                auto value_string = [](DescribedParamValue const& p) {
+                    return *p.info.LinearValueToString(p.LinearValue());
+                };
+                Tooltip(g,
+                        loop_region_id,
+                        loop_region_r,
+                        fmt::Format(g.scratch_arena,
+                                    "Loop Start: {}\nLoop End: {}\nCrossfade Size: {}\n"
+                                    "Drag to move the loop, keeping its length and crossfade",
+                                    value_string(start_param),
+                                    value_string(end_param),
+                                    value_string(xfade_param)),
+                        {.avoid_r = avoid_r});
+            }
         }
 
         // Crossfade control.

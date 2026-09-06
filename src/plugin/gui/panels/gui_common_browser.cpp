@@ -2274,7 +2274,7 @@ static void DoBrowserPopupInternal(GuiBuilder& builder,
                     cfg.draw_scrollbars = DrawModalScrollbarsDarkMode, cfg.scrollbar_inside_padding = true;
                     cfg.scrollbar_visibility = {imgui::ViewportScrollbarVisibility::Never,
                                                 imgui::ViewportScrollbarVisibility::Auto};
-                    cfg.padding = {.lr = k_browser_spacing};
+                    cfg.padding = {.lr = k_scrollbar_width};
                     cfg.scroll_line_size = k_browser_item_height;
                     cfg;
                 }),
@@ -2603,7 +2603,7 @@ static void DoBrowserPopupInternal(GuiBuilder& builder,
                               cfg.scrollbar_inside_padding = true;
                               cfg.scrollbar_visibility = {imgui::ViewportScrollbarVisibility::Never,
                                                           imgui::ViewportScrollbarVisibility::Auto};
-                              cfg.padding = {.lr = k_browser_spacing};
+                              cfg.padding = {.lr = k_scrollbar_width};
                               cfg.scroll_line_size = k_browser_item_height;
                               cfg;
                           }),

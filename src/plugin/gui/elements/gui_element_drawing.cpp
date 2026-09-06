@@ -727,53 +727,92 @@ void DrawLoudnessMeter(imgui::Context& imgui, Rect r, DrawLoudnessMeterOptions c
     }
 }
 
-void DrawMidPanelScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars) {
-    for (auto const b : bars) {
-        if (!b) continue;
-        auto const rounding = WwToPixels(k_corner_rounding);
-        imgui.draw_list->AddRectFilled(b->strip, LiveCol(UiColMap::ScrollbarBack), rounding);
-        u32 handle_col = LiveCol(UiColMap::ScrollbarHandle);
-        if (imgui.IsHot(b->id))
-            handle_col = LiveCol(UiColMap::ScrollbarHandleHover);
-        else if (imgui.IsActive(b->id, MouseButton::Left))
-            handle_col = LiveCol(UiColMap::ScrollbarHandleActive);
-        imgui.draw_list->AddRectFilled(b->handle, handle_col, rounding);
+struct ScrollbarColours {
+    u32 channel;
+    u32 handle;
+    u32 handle_viewport_hovered;
+    u32 handle_hot;
+    u32 arrow;
+    u32 arrow_hot;
+    u32 button_back_hot;
+};
+
+static void DrawScrollbar(imgui::Context const& imgui,
+                          imgui::ViewportScrollbar const& bar,
+                          usize bar_index,
+                          ScrollbarColours const& colours) {
+    auto const rounding = WwToPixels(1.5f);
+    auto const inset = Max(1.0f, Round(WwToPixels(1.0f)));
+
+    // Channel.
+    {
+        auto channel = bar.strip;
+        if (bar.buttons)
+            channel = Rect::FromMinMax(Min(channel.Min(), (*bar.buttons)[0].rect.Min()),
+                                       Max(channel.Max(), (*bar.buttons)[1].rect.Max()));
+        imgui.draw_list->AddRectFilled(channel, colours.channel, rounding);
     }
+
+    // Buttons.
+    if (bar.buttons) {
+        auto const is_vertical = bar_index == 1;
+        auto const axis = is_vertical ? f32x2 {0, 1} : f32x2 {1, 0};
+        auto const perpendicular = is_vertical ? f32x2 {1, 0} : f32x2 {0, 1};
+        for (auto const button_index : Range(2uz)) {
+            auto const& button = (*bar.buttons)[button_index];
+            auto const hot = imgui.IsHotOrActive(button.id, MouseButton::Left);
+            if (hot)
+                imgui.draw_list->AddRectFilled(button.rect.Reduced(inset), colours.button_back_hot, rounding);
+
+            auto const centre = button.rect.Centre();
+            auto const direction = axis * (button_index == 0 ? -1.0f : 1.0f);
+            auto const half_size = Min(button.rect.w, button.rect.h) * 0.25f;
+            imgui.draw_list->AddTriangleFilled(centre + (direction * half_size),
+                                               centre - (direction * half_size) + (perpendicular * half_size),
+                                               centre - (direction * half_size) - (perpendicular * half_size),
+                                               hot ? colours.arrow_hot : colours.arrow);
+        }
+    }
+
+    // Handle.
+    {
+        auto handle_col = colours.handle;
+        if (imgui.IsHotOrActive(bar.id, MouseButton::Left))
+            handle_col = colours.handle_hot;
+        else if (imgui.IsViewportHovered(imgui.curr_viewport))
+            handle_col = colours.handle_viewport_hovered;
+        imgui.draw_list->AddRectFilled(bar.handle.Reduced(inset), handle_col, rounding);
+    }
+}
+
+void DrawMidPanelScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars) {
+    ScrollbarColours const colours {
+        .channel = LiveCol(UiColMap::ScrollbarBack),
+        .handle = LiveCol(UiColMap::ScrollbarHandle),
+        .handle_viewport_hovered = LiveCol(UiColMap::ScrollbarHandleViewportHover),
+        .handle_hot = LiveCol(UiColMap::ScrollbarHandleHover),
+        .arrow = LiveCol(UiColMap::ScrollbarHandle),
+        .arrow_hot = LiveCol(UiColMap::ScrollbarHandleHover),
+        .button_back_hot = LiveCol(UiColMap::ScrollbarButtonHover),
+    };
+    for (auto const bar_index : Range(bars.size))
+        if (auto const& b = bars[bar_index]) DrawScrollbar(imgui, *b, bar_index, colours);
 }
 
 static void DrawModalScrollbarsWithMode(imgui::Context const& imgui,
                                         imgui::ViewportScrollbars const& bars,
                                         bool dark_mode) {
-    for (auto const b : bars) {
-        if (!b) continue;
-        if (imgui.IsViewportHovered(imgui.curr_viewport) || imgui.IsActive(b->id, MouseButton::Left)) {
-            auto const hot_or_active = imgui.IsHotOrActive(b->id, MouseButton::Left);
-            auto const rounding = WwToPixels(k_panel_rounding);
-
-            // Channel.
-            if (hot_or_active) {
-                u32 col = ToU32({.c = Col::Background2, .dark_mode = dark_mode});
-                imgui.draw_list->AddRectFilled(b->strip, col, rounding);
-            }
-
-            // Handle.
-            {
-                auto handle_rect = b->handle;
-                u32 handle_col = ToU32({.c = Col::Surface1, .dark_mode = dark_mode});
-                if (hot_or_active) handle_col = ToU32({.c = Col::Overlay0, .dark_mode = dark_mode});
-                if (imgui.curr_viewport->cfg.scrollbar_inside_padding) {
-                    auto const pad_l = WwToPixels(hot_or_active ? 1 : 3.0f);
-                    auto const pad_r = 0;
-                    auto const total_pad = pad_l + pad_r;
-                    if (handle_rect.w > total_pad) {
-                        handle_rect.x += pad_l;
-                        handle_rect.w -= total_pad;
-                    }
-                }
-                imgui.draw_list->AddRectFilled(handle_rect, handle_col, rounding);
-            }
-        }
-    }
+    ScrollbarColours const colours {
+        .channel = ToU32({.c = Col::Surface0, .dark_mode = dark_mode}),
+        .handle = ToU32({.c = Col::Overlay0, .dark_mode = dark_mode}),
+        .handle_viewport_hovered = ToU32({.c = Col::Overlay1, .dark_mode = dark_mode}),
+        .handle_hot = ToU32({.c = Col::Overlay2, .dark_mode = dark_mode}),
+        .arrow = ToU32({.c = Col::Overlay1, .dark_mode = dark_mode}),
+        .arrow_hot = ToU32({.c = Col::Text, .dark_mode = dark_mode}),
+        .button_back_hot = ToU32({.c = Col::Surface2, .dark_mode = dark_mode}),
+    };
+    for (auto const bar_index : Range(bars.size))
+        if (auto const& b = bars[bar_index]) DrawScrollbar(imgui, *b, bar_index, colours);
 }
 
 void DrawModalScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars) {

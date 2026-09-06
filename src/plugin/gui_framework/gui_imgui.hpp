@@ -157,10 +157,19 @@ struct TextInputConfig {
 // Draw the background of the imgui.curr_viewport. Typically using the viewport's unpadded bounded.
 using DrawViewportBackgroundFunction = TrivialFunctionRef<void(Context const& imgui)>;
 
+struct ViewportScrollbarButton {
+    Rect rect;
+    imgui::Id id; // Use with IsHot(), etc.
+};
+
 struct ViewportScrollbar {
-    Rect strip; // Long strip that the handle sits in.
+    Rect strip; // Long strip that the handle sits in. Excludes the buttons, if there are any.
     Rect handle; // The bit that you can grab.
     imgui::Id id; // ID for the handle - use with IsHot(), etc.
+
+    // Arrow buttons at either end of the strip. Only present when ViewportConfig::scroll_button_size is
+    // non-zero. [0] scrolls towards the start (up/left), [1] scrolls towards the end (down/right).
+    Optional<Array<ViewportScrollbarButton, 2>> buttons;
 };
 
 using ViewportScrollbars = Array<Optional<ViewportScrollbar>, 2>; // x, y
@@ -245,7 +254,12 @@ struct ViewportConfig {
     // usable space in the axis that the scrollbar would appear.
     f32 scrollbar_padding {};
     f32 scrollbar_width {4}; // Ignored if scrollbar_inside_padding.
-    f32 scroll_line_size {}; // Mouse scroll step amount. 0 means use default.
+    f32 scroll_line_size {}; // Mouse scroll and scroll button step amount. 0 means use default.
+
+    // Length, along the scroll axis, of the arrow buttons at each end of the scrollbar. Clicking (or holding)
+    // a button scrolls by scroll_line_size. 0 means no buttons. The draw_scrollbars function is
+    // responsible for drawing them.
+    f32 scroll_button_size {};
 
     // Automatically set the size of the viewport based on what rectangles are registered into it.
     b8x2 auto_size = false;

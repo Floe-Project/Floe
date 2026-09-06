@@ -1784,6 +1784,7 @@ static void DoEffects(GuiState& g, GuiFrameContext const& frame_context, Box str
                               .draw_scrollbars = DrawMidPanelScrollbars,
                               .padding = {.r = k_scrollbar_width},
                               .scrollbar_padding = k_scrollbar_rhs_space,
+                              .scroll_button_size = k_scroll_button_size,
                               .scrollbar_visibility = {imgui::ViewportScrollbarVisibility::Never,
                                                        imgui::ViewportScrollbarVisibility::Auto},
                               .scrollbar_inside_padding = true,

@@ -21,7 +21,8 @@ constexpr Id k_root_viewport_id = 4;
 
 constexpr f64 k_popup_open_and_close_delay_sec {0.1};
 static constexpr f64 k_text_cursor_blink_rate {0.5};
-static constexpr f64 k_button_repeat_rate {0.5};
+static constexpr f64 k_button_repeat_initial_delay {0.4};
+static constexpr f64 k_button_repeat_rate {0.05};
 
 bool Context::IsBlockedByExclusiveFocus(Viewport const* v) const {
     if (!exclusive_focus_viewport) return false;
@@ -380,6 +381,12 @@ struct ScrollbarResult {
     ViewportScrollbar bar;
 };
 
+static f32 ScrollLineSize(Viewport const& viewport) {
+    return viewport.cfg.scroll_line_size > 0 ? viewport.cfg.scroll_line_size : WwToPixels(20.0f);
+}
+
+// Everything is calculated as if the scrollbar is vertical: 'y' is the scroll axis. Rects are transposed for
+// horizontal scrollbars.
 static ScrollbarResult Scrollbar(Context& im,
                                  Viewport* viewport,
                                  bool is_vertical,
@@ -388,67 +395,12 @@ static ScrollbarResult Scrollbar(Context& im,
                                  f32 viewport_right,
                                  f32 content_size_y,
                                  f32 y_scroll_value,
-                                 f32 y_scroll_max,
                                  f32 cursor_y) {
-    auto id = im.MakeId(is_vertical ? "Vert" : "Horz");
+    auto const id = im.MakeId(is_vertical ? "Vert" : "Horz");
 
-    y_scroll_max = ::Max(0.0f, content_size_y - viewport_h);
-
-    if (content_size_y > viewport_h && ((y_scroll_value + viewport_h) > content_size_y))
-        y_scroll_value = (f32)(int)(content_size_y - viewport_h);
-
-    auto height_ratio = viewport_h / content_size_y;
-    if (height_ratio > 1) height_ratio = 1;
-    auto const scrollbar_h = viewport_h * height_ratio;
-    f32 const scrollbar_range = viewport_h - scrollbar_h;
-    f32 scrollbar_rel_y = (y_scroll_value / y_scroll_max) * scrollbar_range;
-    if (scrollbar_range == 0) scrollbar_rel_y = 0;
-
-    Rect scroll_r;
-    scroll_r.x = viewport_right + viewport->cfg.scrollbar_padding;
-    scroll_r.y = viewport_y + scrollbar_rel_y;
-    scroll_r.w = viewport->cfg.scrollbar_width;
-    scroll_r.h = scrollbar_h;
-    auto scrollbar_bb = Rect {.xywh = {scroll_r.x, viewport_y, viewport->cfg.scrollbar_width, viewport_h}};
-    f32* scroll_y = &scroll_r.y;
-
-    if (!is_vertical) {
-        f32 w;
-        f32 x;
-
-        x = scrollbar_bb.x;
-        scrollbar_bb.x = scrollbar_bb.y;
-        scrollbar_bb.y = x;
-        w = scrollbar_bb.w;
-        scrollbar_bb.w = scrollbar_bb.h;
-        scrollbar_bb.h = w;
-
-        x = scroll_r.x;
-        scroll_r.x = scroll_r.y;
-        scroll_r.y = x;
-        w = scroll_r.w;
-        scroll_r.w = scroll_r.h;
-        scroll_r.h = w;
-
-        scroll_y = &scroll_r.x;
-    }
-
-    if (scrollbar_range != 0) {
-        ButtonConfig const button_cfg {.mouse_button = MouseButton::Left,
-                                       .event = MouseButtonEvent::Down,
-                                       .is_non_viewport_content = true};
-        static f32x2 cached_pos {};
-        if (im.ButtonBehaviour(scroll_r, id, button_cfg)) cached_pos.y = cursor_y - *scroll_y;
-
-        if (im.IsActive(id, MouseButton::Left)) {
-            auto const new_ypos = (cursor_y - cached_pos.y) - viewport_y;
-            scrollbar_rel_y = Clamp(new_ypos, 0.0f, viewport_h - scrollbar_h);
-            *scroll_y = viewport_y + scrollbar_rel_y;
-
-            f32 const y_scroll_percent = Map(scrollbar_rel_y, 0, scrollbar_range, 0, 1);
-            y_scroll_value = Round(y_scroll_percent * y_scroll_max);
-        }
-    }
+    auto const oriented = [is_vertical](Rect r) {
+        return is_vertical ? r : Rect {.xywh = {r.y, r.x, r.h, r.w}};
+    };
 
     // Cuts all dimensions to integer bounds, but always shrinks the rectangle, never expands it.
     auto const integer_bounds = [](Rect r) {
@@ -457,14 +409,73 @@ static ScrollbarResult Scrollbar(Context& im,
         return Rect::FromMinMax(min, max);
     };
 
+    auto const y_scroll_max = ::Max(0.0f, content_size_y - viewport_h);
+    if (y_scroll_value > y_scroll_max) y_scroll_value = (f32)(int)y_scroll_max;
+
+    auto const x = viewport_right + viewport->cfg.scrollbar_padding;
+    auto const w = viewport->cfg.scrollbar_width;
+
+    auto const button_size = viewport->cfg.scroll_button_size;
+    auto const has_buttons = button_size > 0 && viewport_h > (button_size * 3);
+
+    Optional<Array<ViewportScrollbarButton, 2>> buttons {};
+    if (has_buttons) {
+        buttons = Array<ViewportScrollbarButton, 2> {{
+            {
+                .rect = integer_bounds(oriented({.xywh = {x, viewport_y, w, button_size}})),
+                .id = im.MakeId(is_vertical ? "VertDec" : "HorzDec"),
+            },
+            {
+                .rect = integer_bounds(
+                    oriented({.xywh = {x, viewport_y + viewport_h - button_size, w, button_size}})),
+                .id = im.MakeId(is_vertical ? "VertInc" : "HorzInc"),
+            },
+        }};
+
+        ButtonConfig const button_cfg {.mouse_button = MouseButton::Left,
+                                       .event = MouseButtonEvent::Down,
+                                       .hold_to_repeat = true,
+                                       .is_non_viewport_content = true};
+        auto const step = ScrollLineSize(*viewport);
+        for (auto const button_index : Range(2uz)) {
+            auto const& button = (*buttons)[button_index];
+            if (im.ButtonBehaviour(button.rect, button.id, button_cfg)) {
+                auto const direction = button_index == 0 ? -1.0f : 1.0f;
+                y_scroll_value = Round(Clamp(y_scroll_value + (direction * step), 0.0f, y_scroll_max));
+            }
+        }
+    }
+
+    auto const track_y = viewport_y + (has_buttons ? button_size : 0);
+    auto const track_h = viewport_h - (has_buttons ? button_size * 2 : 0);
+    auto const handle_h = track_h * Min(1.0f, viewport_h / content_size_y);
+    auto const handle_range = track_h - handle_h;
+    f32 handle_rel_y = handle_range == 0 ? 0 : (y_scroll_value / y_scroll_max) * handle_range;
+
+    if (handle_range != 0) {
+        ButtonConfig const button_cfg {.mouse_button = MouseButton::Left,
+                                       .event = MouseButtonEvent::Down,
+                                       .is_non_viewport_content = true};
+        static f32 cached_grab_offset {};
+        auto const handle_rect = oriented({.xywh = {x, track_y + handle_rel_y, w, handle_h}});
+        if (im.ButtonBehaviour(handle_rect, id, button_cfg))
+            cached_grab_offset = cursor_y - (track_y + handle_rel_y);
+
+        if (im.IsActive(id, MouseButton::Left)) {
+            handle_rel_y = Clamp((cursor_y - cached_grab_offset) - track_y, 0.0f, handle_range);
+            y_scroll_value = Round(Map(handle_rel_y, 0, handle_range, 0, 1) * y_scroll_max);
+        }
+    }
+
     return {
         .new_scroll_value = y_scroll_value,
         .new_scroll_max = y_scroll_max,
         .bar =
             {
-                .strip = integer_bounds(scrollbar_bb),
-                .handle = integer_bounds(scroll_r),
+                .strip = integer_bounds(oriented({.xywh = {x, track_y, w, track_h}})),
+                .handle = integer_bounds(oriented({.xywh = {x, track_y + handle_rel_y, w, handle_h}})),
                 .id = id,
+                .buttons = buttons,
             },
     };
 }
@@ -735,9 +746,7 @@ void Context::BeginFrame(ViewportConfig cfg, Fonts& fonts) {
             viewport = viewport->parent_viewport;
         }
         if (final_viewport) {
-            f32 const pixels_per_line = final_viewport->cfg.scroll_line_size > 0
-                                            ? final_viewport->cfg.scroll_line_size
-                                            : WwToPixels(20.0f);
+            f32 const pixels_per_line = ScrollLineSize(*final_viewport);
             f32 const lines = -frame_input.mouse_scroll_delta_in_lines;
             f32 const new_scroll = (lines * pixels_per_line) + final_viewport->scroll_offset.y;
             final_viewport->scroll_offset.y = Round(Clamp(new_scroll, 0.0f, final_viewport->scroll_max.y));
@@ -1789,7 +1798,7 @@ bool Context::ButtonBehaviour(Rect r, Id id, ButtonConfig cfg) {
 
     if (cfg.hold_to_repeat) {
         if (WasJustActivated(id, cfg.mouse_button))
-            button_repeat_counter = GuiIo().in.current_time + k_button_repeat_rate;
+            button_repeat_counter = GuiIo().in.current_time + k_button_repeat_initial_delay;
         else if (is_active) {
             if (GuiIo().WakeupAtTimedInterval(button_repeat_counter,
                                               k_button_repeat_rate,
@@ -2103,7 +2112,6 @@ void Context::BeginViewport(ViewportConfig const& cfg, Viewport* viewport, Rect 
                                           bounds_for_scrollbar.Right(),
                                           viewport->prev_content_size.y,
                                           viewport->scroll_offset.y,
-                                          viewport->scroll_max.y,
                                           GuiIo().in.cursor_pos.y);
             scrollbar_bounds[1] = result.bar;
             viewport->scroll_offset.y = result.new_scroll_value;
@@ -2130,7 +2138,6 @@ void Context::BeginViewport(ViewportConfig const& cfg, Viewport* viewport, Rect 
                                           bounds_for_scrollbar.Bottom(),
                                           viewport->prev_content_size.x,
                                           viewport->scroll_offset.x,
-                                          viewport->scroll_max.x,
                                           GuiIo().in.cursor_pos.x);
             scrollbar_bounds[0] = result.bar;
             viewport->scroll_offset.x = result.new_scroll_value;

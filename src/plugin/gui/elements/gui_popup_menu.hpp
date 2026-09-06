@@ -17,6 +17,7 @@ constexpr imgui::ViewportConfig k_default_popup_menu_viewport {
     .padding = {.lr = 1, .tb = k_panel_rounding},
     .scrollbar_padding = k_scrollbar_rhs_space,
     .scrollbar_width = k_scrollbar_width,
+    .scroll_button_size = k_scroll_button_size,
     .auto_size = true,
 };
 

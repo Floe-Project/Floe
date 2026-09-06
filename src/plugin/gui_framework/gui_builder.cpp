@@ -29,6 +29,7 @@ static imgui::ViewportConfig ConvertViewportConfigWwToPixels(imgui::ViewportConf
     c.scrollbar_width = WwToPixels(c.scrollbar_width);
     c.scrollbar_padding = Max(2.0f, WwToPixels(c.scrollbar_padding));
     c.scroll_line_size = WwToPixels(c.scroll_line_size);
+    c.scroll_button_size = WwToPixels(c.scroll_button_size);
     return c;
 }
 

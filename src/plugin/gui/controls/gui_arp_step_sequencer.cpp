@@ -61,7 +61,9 @@ void DoArpStepSequencer(GuiState& g,
         {
             .positioning = imgui::ViewportPositioning::WindowAbsolute,
             .draw_scrollbars = DrawMidPanelScrollbars,
-            .scrollbar_width = WwToPixels(6.0f),
+            .scrollbar_width = WwToPixels(8.0f),
+            .scroll_line_size = step_stride,
+            .scroll_button_size = WwToPixels(6.0f),
             .scrollbar_visibility = {show_all ? imgui::ViewportScrollbarVisibility::Never
                                               : imgui::ViewportScrollbarVisibility::Auto,
                                      imgui::ViewportScrollbarVisibility::Never},

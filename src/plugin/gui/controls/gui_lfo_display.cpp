@@ -9,6 +9,7 @@
 #include "gui/core/gui_state.hpp"
 #include "gui/elements/gui_common_elements.hpp"
 #include "gui/elements/gui_constants.hpp"
+#include "gui/elements/gui_param_elements.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "processing_utils/synced_timings.hpp"
@@ -73,6 +74,82 @@ static f32 LfoShapeValue(param_values::LfoShape shape, f32 phase) {
     return 0;
 }
 
+// Two-dimensional drag: horizontal drives the rate parameter that the sync switch selects, vertical
+// drives the amount. Each axis uses the same pixels-per-range as the control it mirrors below the
+// display.
+static void DoLfoDisplayDrag(GuiState& g,
+                             Rect window_r,
+                             imgui::Id id,
+                             DescribedParamValue const& amount_param,
+                             DescribedParamValue const& rate_param,
+                             bool sync_on) {
+    auto& imgui = g.imgui;
+    auto& processor = g.engine.processor;
+    auto const& frame_input = GuiIo().in;
+
+    auto const amount_index = amount_param.info.index;
+    auto const rate_index = rate_param.info.index;
+
+    static f32x2 drag_start_pos;
+    static f32 amount_at_drag_start;
+    static f32 rate_at_drag_start;
+
+    auto const anchor_drag = [&]() {
+        drag_start_pos = frame_input.cursor_pos;
+        amount_at_drag_start = amount_param.LinearValue();
+        rate_at_drag_start = rate_param.LinearValue();
+    };
+
+    if (imgui.ButtonBehaviour(window_r, id, imgui::SliderConfig::k_activation_cfg)) {
+        anchor_drag();
+        ParameterJustStartedMoving(processor, amount_index);
+        ParameterJustStartedMoving(processor, rate_index);
+    }
+
+    if (imgui.IsActive(id, MouseButton::Left)) {
+        if (frame_input.Key(KeyCode::ShiftL).presses.size || frame_input.Key(KeyCode::ShiftR).presses.size)
+            anchor_drag();
+
+        if (All(frame_input.cursor_pos != -1)) {
+            auto const slower = frame_input.modifiers.Get(ModifierKey::Shift) ? 4.0f : 1.0f;
+            auto const delta = frame_input.cursor_pos - drag_start_pos;
+
+            auto const& amount_range = amount_param.info.linear_range;
+            auto const& rate_range = rate_param.info.linear_range;
+
+            auto const amount_pixels_for_range = 256.0f * slower;
+            auto const rate_pixels_for_range = (sync_on ? 20.0f * rate_range.Delta() : 256.0f) * slower;
+
+            auto const new_amount =
+                Clamp(amount_at_drag_start - ((delta.y / amount_pixels_for_range) * amount_range.Delta()),
+                      amount_range.min,
+                      amount_range.max);
+            auto const new_rate =
+                Clamp(rate_at_drag_start + ((delta.x / rate_pixels_for_range) * rate_range.Delta()),
+                      rate_range.min,
+                      rate_range.max);
+
+            if (new_amount != amount_param.LinearValue())
+                SetParameterValue(processor, amount_index, new_amount, {});
+            if (new_rate != rate_param.LinearValue()) SetParameterValue(processor, rate_index, new_rate, {});
+        }
+    }
+
+    if (imgui.WasJustDeactivated(id, MouseButton::Left)) {
+        ParameterJustStoppedMoving(processor, amount_index);
+        ParameterJustStoppedMoving(processor, rate_index);
+    }
+
+    if (imgui.IsHotOrActive(id, MouseButton::Left)) GuiIo().out.wants.cursor_type = CursorType::AllArrows;
+
+    AddParamContextMenuBehaviour(g, window_r, id, Array {amount_param, rate_param});
+
+    DescribedParamValue const* popup_params[] = {&amount_param, &rate_param};
+    ParameterValuePopup(g, popup_params, id, window_r);
+
+    Tooltip(g, id, window_r, "Drag left/right for time, up/down for amount"_s, {});
+}
+
 void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out) {
     auto& imgui = g.imgui;
     auto& engine = g.engine;
@@ -80,8 +157,26 @@ void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out)
 
     auto const& macro_dests = engine.processor.main_macro_destinations;
 
+    auto const shape_param = params.DescribedValue(layer_index, LayerParamIndex::LfoShape);
+    auto const amount_param = params.DescribedValue(layer_index, LayerParamIndex::LfoAmount);
+    auto const sync_on = params.BoolValue(layer_index, LayerParamIndex::LfoSyncSwitch);
+    auto const rate_param =
+        params.DescribedValue(layer_index,
+                              sync_on ? LayerParamIndex::LfoRateTempoSynced : LayerParamIndex::LfoRateHz);
+
+    auto const drag_id = ({
+        auto h = HashInit();
+        HashUpdate(h, SourceLocationHash());
+        HashUpdate(h, layer_index);
+        (imgui::Id) h;
+    });
+    auto const window_rect = imgui.RegisterAndConvertRect(viewport_r);
+
+    if (!IsAnyLegacyOverriding(amount_param.info.index, params.values) &&
+        !IsAnyLegacyOverriding(rate_param.info.index, params.values))
+        DoLfoDisplayDrag(g, window_rect, drag_id, amount_param, rate_param, sync_on);
+
     // Background.
-    auto const window_rect = imgui.ViewportRectToWindowRect(viewport_r);
     imgui.draw_list->AddRectFilled(window_rect, LiveCol(UiColMap::EqBack), WwToPixels(k_corner_rounding));
 
     // Centre line.
@@ -91,13 +186,6 @@ void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out)
         auto const p1 = imgui.ViewportPosToWindowPos({viewport_r.Right(), centre_y});
         imgui.draw_list->AddLine(p0, p1, LiveCol(UiColMap::EqGridZero));
     }
-
-    auto const shape_param = params.DescribedValue(layer_index, LayerParamIndex::LfoShape);
-    auto const amount_param = params.DescribedValue(layer_index, LayerParamIndex::LfoAmount);
-    auto const sync_on = params.BoolValue(layer_index, LayerParamIndex::LfoSyncSwitch);
-    auto const rate_param =
-        params.DescribedValue(layer_index,
-                              sync_on ? LayerParamIndex::LfoRateTempoSynced : LayerParamIndex::LfoRateHz);
 
     auto const shape = shape_param.IntValue<param_values::LfoShape>();
     auto const amount_linear =
@@ -164,6 +252,15 @@ void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out)
         imgui.draw_list->AddConvexPolyFilled(verts, area_col, false);
     }
 
-    auto const line_col = greyed_out ? LiveCol(UiColMap::EqLineGreyedOut) : LiveCol(UiColMap::EqLine);
+    auto const line_col = ({
+        u32 c;
+        if (greyed_out)
+            c = LiveCol(UiColMap::EqLineGreyedOut);
+        else if (imgui.IsHotOrActive(drag_id, MouseButton::Left))
+            c = LiveCol(UiColMap::EqHandleHover);
+        else
+            c = LiveCol(UiColMap::EqLine);
+        c;
+    });
     imgui.draw_list->AddPolyline(curve_points, line_col, false, 1.5f, true);
 }

@@ -704,8 +704,8 @@ void Font::RenderChar(DrawList* draw_list, f32 size, f32x2 pos, u32 col, Char16 
         return;
     if (Glyph const* glyph = FindGlyph(c)) {
         f32 const scale = (size >= 0.0f) ? (size / font_size) : 1.0f;
-        pos.x = (f32)(int)pos.x + display_offset.x;
-        pos.y = (f32)(int)pos.y + display_offset.y;
+        pos.x = Floor(pos.x + 0.5f) + display_offset.x;
+        pos.y = Floor(pos.y + 0.5f) + display_offset.y;
         f32x2 const pos_tl {pos.x + (glyph->x0 * scale), pos.y + (glyph->y0 * scale)};
         f32x2 const pos_br {pos.x + (glyph->x1 * scale), pos.y + (glyph->y1 * scale)};
         draw_list->PrimReserve(6, 4);
@@ -768,8 +768,8 @@ void Font::RenderText(DrawList* draw_list,
                       MultilineTextAlignment multiline_alignment,
                       f32 multiline_alignment_width) const {
     // Align to be pixel perfect
-    pos.x = (f32)(int)pos.x + display_offset.x;
-    pos.y = (f32)(int)pos.y + display_offset.y;
+    pos.x = Floor(pos.x + 0.5f) + display_offset.x;
+    pos.y = Floor(pos.y + 0.5f) + display_offset.y;
     f32 x = pos.x;
     f32 y = pos.y;
     if (y > clip_rect.w) return;

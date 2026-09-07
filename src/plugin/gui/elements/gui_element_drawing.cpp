@@ -3,6 +3,8 @@
 
 #include "gui/elements/gui_element_drawing.hpp"
 
+#include <IconsFontAwesome6.h>
+
 #include "foundation/foundation.hpp"
 
 #include "gui/elements/gui_constants.hpp"
@@ -756,21 +758,23 @@ static void DrawScrollbar(imgui::Context const& imgui,
     // Buttons.
     if (bar.buttons) {
         auto const is_vertical = bar_index == 1;
-        auto const axis = is_vertical ? f32x2 {0, 1} : f32x2 {1, 0};
-        auto const perpendicular = is_vertical ? f32x2 {1, 0} : f32x2 {0, 1};
+        auto const* font = imgui.draw_list->fonts.atlas[ToInt(FontType::Icons)];
         for (auto const button_index : Range(2uz)) {
             auto const& button = (*bar.buttons)[button_index];
             auto const hot = imgui.IsHotOrActive(button.id, MouseButton::Left);
             if (hot)
                 imgui.draw_list->AddRectFilled(button.rect.Reduced(inset), colours.button_back_hot, rounding);
 
-            auto const centre = button.rect.Centre();
-            auto const direction = axis * (button_index == 0 ? -1.0f : 1.0f);
-            auto const half_size = Min(button.rect.w, button.rect.h) * 0.25f;
-            imgui.draw_list->AddTriangleFilled(centre + (direction * half_size),
-                                               centre - (direction * half_size) + (perpendicular * half_size),
-                                               centre - (direction * half_size) - (perpendicular * half_size),
-                                               hot ? colours.arrow_hot : colours.arrow);
+            String const icon = is_vertical ? (button_index == 0 ? ICON_FA_CARET_UP : ICON_FA_CARET_DOWN)
+                                            : (button_index == 0 ? ICON_FA_CARET_LEFT : ICON_FA_CARET_RIGHT);
+            auto const font_size = Min(button.rect.w, button.rect.h) * 0.8f;
+            auto const text_size = font->CalcTextSize(icon, {.font_size = font_size});
+            font->RenderText(imgui.draw_list,
+                             font_size,
+                             button.rect.Centre() - (text_size / 2),
+                             hot ? colours.arrow_hot : colours.arrow,
+                             imgui.draw_list->clip_rect_stack.Back(),
+                             icon);
         }
     }
 

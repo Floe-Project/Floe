@@ -766,7 +766,7 @@ Box DoKnobParameter(GuiState& g,
     if (auto const viewport_r = BoxRect(g.builder, container)) {
         auto const window_r = g.builder.imgui.RegisterAndConvertRect(*viewport_r);
 
-        if (!legacy_override) {
+        if (!legacy_override && !options.is_fake) {
             auto const dragger_result = g.builder.imgui.DraggerBehaviour({
                 .rect_in_window_coords = window_r,
                 .id = container.imgui_id,
@@ -957,7 +957,7 @@ Box DoVerticalSliderParameter(GuiState& g,
     if (auto const viewport_r = BoxRect(g.builder, container)) {
         auto const window_r = g.builder.imgui.RegisterAndConvertRect(*viewport_r);
 
-        if (!legacy_override) {
+        if (!legacy_override && !options.is_fake) {
             auto const dragger_result = g.builder.imgui.DraggerBehaviour({
                 .rect_in_window_coords = window_r,
                 .id = container.imgui_id,

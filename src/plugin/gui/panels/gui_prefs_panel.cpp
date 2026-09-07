@@ -16,6 +16,7 @@
 #include "gui/elements/gui_modal.hpp"
 #include "gui/elements/gui_popup_menu.hpp"
 #include "gui_framework/app_window_sizes.hpp"
+#include "gui_framework/font_type.hpp"
 #include "gui_framework/gui_builder.hpp"
 #include "plugin/plugin.hpp"
 
@@ -139,6 +140,7 @@ static FolderSelectorResult PreferencesFolderSelector(GuiBuilder& builder,
                                           .text = ICON_FA_TRASH,
                                           .size_from_text = true,
                                           .font = FontType::Icons,
+                                          .font_size = k_font_icons_size * 0.8f,
                                           .text_colours = Col {.c = Col::Subtext0},
                                           .background_fill_auto_hot_active_overlay = true,
                                           .round_background_corners = 0b1111,
@@ -155,6 +157,7 @@ static FolderSelectorResult PreferencesFolderSelector(GuiBuilder& builder,
                   .text = ICON_FA_UP_RIGHT_FROM_SQUARE,
                   .size_from_text = true,
                   .font = FontType::Icons,
+                  .font_size = k_font_icons_size * 0.8f,
                   .text_colours = Col {.c = Col::Subtext0},
                   .background_fill_auto_hot_active_overlay = true,
                   .round_background_corners = 0b1111,

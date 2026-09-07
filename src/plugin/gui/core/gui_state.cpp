@@ -15,6 +15,7 @@
 
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
+#include "gui/core/custom_icons.hpp"
 #include "gui/core/gui_file_picker.hpp"
 #include "gui/core/gui_frame_context.hpp"
 #include "gui/core/gui_library_images.hpp"
@@ -132,18 +133,24 @@ static constexpr auto k_icon_glyph_ranges = []() {
     return ranges;
 }();
 
+static constexpr auto k_custom_icon_glyph_ranges = Array {
+    GlyphRange {ICON_CUSTOM_MIN, ICON_CUSTOM_MAX},
+};
+
 static void CreateFontsIfNeeded(FontAtlas& fonts) {
     auto& renderer = *GuiIo().in.renderer;
 
     if (renderer.font_texture == renderer.invalid_texture) {
         fonts.Clear();
 
-        auto const load_font = [&](BinaryData ttf, f32 font_size, Span<GlyphRange const> ranges) {
-            font_size *= GuiIo().in.pixels_per_ww;
-            FontConfig config {};
-            config.font_data_reference_only = true;
-            fonts.AddFontFromMemoryTTF((void*)ttf.data, ttf.size, font_size, config, ranges);
-        };
+        auto const load_font =
+            [&](BinaryData ttf, f32 font_size, Span<GlyphRange const> ranges, bool merge_into_previous) {
+                font_size *= GuiIo().in.pixels_per_ww;
+                FontConfig config {};
+                config.font_data_reference_only = true;
+                config.merge_mode = merge_into_previous;
+                fonts.AddFontFromMemoryTTF((void*)ttf.data, ttf.size, font_size, config, ranges);
+            };
 
         auto const def_ranges = fonts.GetGlyphRangesDefaultAudioPlugin();
         auto const roboto_ttf = EmbeddedRoboto();
@@ -151,21 +158,26 @@ static void CreateFontsIfNeeded(FontAtlas& fonts) {
 
         for (auto const font_type : EnumIterator<FontType>()) {
             switch (font_type) {
-                case FontType::Body: load_font(roboto_ttf, k_font_body_size, def_ranges); break;
+                case FontType::Body: load_font(roboto_ttf, k_font_body_size, def_ranges, false); break;
                 case FontType::BodyItalic:
-                    load_font(roboto_italic_ttf, k_font_body_italic_size, def_ranges);
+                    load_font(roboto_italic_ttf, k_font_body_italic_size, def_ranges, false);
                     break;
-                case FontType::Heading1: load_font(roboto_ttf, k_font_heading1_size, def_ranges); break;
-                case FontType::Heading2: load_font(roboto_ttf, k_font_heading2_size, def_ranges); break;
-                case FontType::Heading3: load_font(roboto_ttf, k_font_heading3_size, def_ranges); break;
+                case FontType::Heading1:
+                    load_font(roboto_ttf, k_font_heading1_size, def_ranges, false);
+                    break;
+                case FontType::Heading2:
+                    load_font(roboto_ttf, k_font_heading2_size, def_ranges, false);
+                    break;
+                case FontType::Heading3:
+                    load_font(roboto_ttf, k_font_heading3_size, def_ranges, false);
+                    break;
                 case FontType::LargeTitle:
-                    load_font(EmbeddedOutfitSemiBold(), k_font_large_title_size, def_ranges);
+                    load_font(EmbeddedOutfitSemiBold(), k_font_large_title_size, def_ranges, false);
                     break;
-                case FontType::Icons: {
-                    auto const icons_ttf = EmbeddedFontAwesome();
-                    load_font(icons_ttf, k_font_icons_size, k_icon_glyph_ranges);
+                case FontType::Icons:
+                    load_font(EmbeddedFontAwesome(), k_font_icons_size, k_icon_glyph_ranges, false);
+                    load_font(EmbeddedCustomIcons(), k_font_icons_size, k_custom_icon_glyph_ranges, true);
                     break;
-                }
                 case FontType::Count: PanicIfReached();
             }
         }

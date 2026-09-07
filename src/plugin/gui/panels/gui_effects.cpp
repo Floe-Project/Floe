@@ -248,22 +248,24 @@ static void DoKnobJoiningLine(GuiState& g, Box knob1, Box knob2) {
     }
 }
 
-static Box DoEffectHeading(GuiState& g, Effect& fx, Box parent) {
+static Box DoEffectHeading(GuiState& g, Effect& fx, Box parent, bool at_rack_top_left) {
     auto const cols = GetFxColMap(fx.type);
     auto const name = k_effect_info[ToInt(fx.type)].name;
 
-    auto const heading_btn = DoBox(g.builder,
-                                   {
-                                       .parent = parent,
-                                       .id_extra = ToInt(fx.type),
-                                       .background_fill_colours = LiveColStruct(cols.back),
-                                       .round_background_corners = 0b0010,
-                                       .layout {
-                                           .size = layout::k_hug_contents,
-                                           .contents_padding {.lr = k_fx_heading_text_pad_lr},
-                                       },
-                                       .button_behaviour = imgui::ButtonConfig {},
-                                   });
+    auto const heading_btn =
+        DoBox(g.builder,
+              {
+                  .parent = parent,
+                  .id_extra = ToInt(fx.type),
+                  .background_fill_colours = LiveColStruct(cols.back),
+                  .round_background_corners = at_rack_top_left ? Corners {0b1010} : Corners {0b0010},
+                  .corner_rounding = k_panel_rounding,
+                  .layout {
+                      .size = layout::k_hug_contents,
+                      .contents_padding {.lr = k_fx_heading_text_pad_lr},
+                  },
+                  .button_behaviour = imgui::ButtonConfig {},
+              });
 
     DoBox(g.builder,
           {
@@ -1475,7 +1477,11 @@ DoEffectSections(GuiState& g, GuiFrameContext const& frame_context, Box root, Ef
                                          },
                                      });
 
-        auto const heading_btn = DoEffectHeading(g, *fx, left_pane);
+        // The first heading sits in the rack panel's rounded corner when unscrolled.
+        bool const at_rack_top_left =
+            effect_sections.size == 0 && g.imgui.curr_viewport->scroll_offset.y == 0;
+
+        auto const heading_btn = DoEffectHeading(g, *fx, left_pane, at_rack_top_left);
         if (auto const r = BoxRect(g.builder, heading_btn))
             DoEffectRightClickMenu(g, heading_btn.imgui_id, g.imgui.ViewportRectToWindowRect(*r), fx->type);
         bool const bypassed = !EffectIsOn(params, fx);

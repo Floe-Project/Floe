@@ -46,13 +46,99 @@ static void SampleLibraryChanged(GuiState& g, sample_lib::LibraryId library_id) 
     InvalidateLibraryImages(g.library_images, library_id, *GuiIo().in.renderer);
 }
 
+// Keep in sync with the icons used across the GUI. Any icon not listed here will render as a missing glyph.
+static constexpr auto k_used_icons = Array {
+    String {ICON_FA_ARROWS_UP_DOWN},
+    String {ICON_FA_ARROW_RIGHT},
+    String {ICON_FA_ARROW_ROTATE_LEFT},
+    String {ICON_FA_ARROW_ROTATE_RIGHT},
+    String {ICON_FA_BOOK_OPEN},
+    String {ICON_FA_BOX_OPEN},
+    String {ICON_FA_BULLSEYE},
+    String {ICON_FA_CARET_DOWN},
+    String {ICON_FA_CARET_LEFT},
+    String {ICON_FA_CARET_RIGHT},
+    String {ICON_FA_CARET_UP},
+    String {ICON_FA_CHECK},
+    String {ICON_FA_CHEVRON_DOWN},
+    String {ICON_FA_CHEVRON_UP},
+    String {ICON_FA_CIRCLE_INFO},
+    String {ICON_FA_CIRCLE_MINUS},
+    String {ICON_FA_CIRCLE_PLUS},
+    String {ICON_FA_CIRCLE_QUESTION},
+    String {ICON_FA_DRUM_STEELPAN},
+    String {ICON_FA_ELLIPSIS_VERTICAL},
+    String {ICON_FA_EYE},
+    String {ICON_FA_FACE_FROWN},
+    String {ICON_FA_FACE_MEH},
+    String {ICON_FA_FACE_SMILE},
+    String {ICON_FA_FILE_IMPORT},
+    String {ICON_FA_FILE_SIGNATURE},
+    String {ICON_FA_FIRE},
+    String {ICON_FA_FLASK},
+    String {ICON_FA_FLOPPY_DISK},
+    String {ICON_FA_FOLDER_OPEN},
+    String {ICON_FA_GAUGE},
+    String {ICON_FA_GAVEL},
+    String {ICON_FA_GEAR},
+    String {ICON_FA_GEM},
+    String {ICON_FA_GUITAR},
+    String {ICON_FA_HAND},
+    String {ICON_FA_HEADPHONES},
+    String {ICON_FA_INFO},
+    String {ICON_FA_LANDMARK},
+    String {ICON_FA_LAYER_GROUP},
+    String {ICON_FA_LINK},
+    String {ICON_FA_LOCATION_ARROW},
+    String {ICON_FA_LOCK},
+    String {ICON_FA_M},
+    String {ICON_FA_MAGNIFYING_GLASS},
+    String {ICON_FA_MASKS_THEATER},
+    String {ICON_FA_MICROCHIP},
+    String {ICON_FA_MUSIC},
+    String {ICON_FA_PEN},
+    String {ICON_FA_POWER_OFF},
+    String {ICON_FA_REPEAT},
+    String {ICON_FA_RIGHT_LONG},
+    String {ICON_FA_ROTATE_LEFT},
+    String {ICON_FA_ROTATE_RIGHT},
+    String {ICON_FA_S},
+    String {ICON_FA_SHUFFLE},
+    String {ICON_FA_SLIDERS},
+    String {ICON_FA_STAR},
+    String {ICON_FA_TAG},
+    String {ICON_FA_TOGGLE_OFF},
+    String {ICON_FA_TOGGLE_ON},
+    String {ICON_FA_TOOLBOX},
+    String {ICON_FA_TRASH},
+    String {ICON_FA_TREE},
+    String {ICON_FA_TRIANGLE_EXCLAMATION},
+    String {ICON_FA_UNLOCK},
+    String {ICON_FA_UP_DOWN},
+    String {ICON_FA_UP_RIGHT_FROM_SQUARE},
+    String {ICON_FA_USERS},
+    String {ICON_FA_VOLUME_HIGH},
+    String {ICON_FA_WAND_MAGIC_SPARKLES},
+    String {ICON_FA_WAVE_SQUARE},
+    String {ICON_FA_XMARK},
+};
+
+static constexpr auto k_icon_glyph_ranges = []() {
+    Array<GlyphRange, k_used_icons.size> ranges {};
+    for (auto const index : Range(k_used_icons.size)) {
+        auto const codepoint = (Char16)Utf8CharacterToUtf32(k_used_icons[index]);
+        ranges[index] = {codepoint, codepoint};
+    }
+    return ranges;
+}();
+
 static void CreateFontsIfNeeded(FontAtlas& fonts) {
     auto& renderer = *GuiIo().in.renderer;
 
     if (renderer.font_texture == renderer.invalid_texture) {
         fonts.Clear();
 
-        auto const load_font = [&](BinaryData ttf, f32 font_size, GlyphRanges ranges) {
+        auto const load_font = [&](BinaryData ttf, f32 font_size, Span<GlyphRange const> ranges) {
             font_size *= GuiIo().in.pixels_per_ww;
             FontConfig config {};
             config.font_data_reference_only = true;
@@ -77,9 +163,7 @@ static void CreateFontsIfNeeded(FontAtlas& fonts) {
                     break;
                 case FontType::Icons: {
                     auto const icons_ttf = EmbeddedFontAwesome();
-                    auto constexpr k_icon_ranges =
-                        Array {GlyphRange {'A', 'Z'}, GlyphRange {ICON_MIN_FA, ICON_MAX_FA}};
-                    load_font(icons_ttf, k_font_icons_size, k_icon_ranges);
+                    load_font(icons_ttf, k_font_icons_size, k_icon_glyph_ranges);
                     break;
                 }
                 case FontType::Count: PanicIfReached();

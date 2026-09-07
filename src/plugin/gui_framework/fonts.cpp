@@ -149,7 +149,6 @@ Font* FontAtlas::AddFontFromMemoryTTF(void* ttf_data,
                                       FontConfig const& font_cfg_arg,
                                       Span<GlyphRange const> glyph_ranges) {
     FontConfig font_cfg = font_cfg_arg;
-    ASSERT(glyph_ranges.size < font_cfg.glyph_ranges.Capacity());
     ASSERT(font_cfg.font_data == nullptr);
     font_cfg.font_data = ttf_data;
     font_cfg.font_data_size = ttf_size;
@@ -412,28 +411,24 @@ void FontAtlas::RenderCustomTexData(int pass, void* p_rects) {
     }
 }
 
-GlyphRanges FontAtlas::GetGlyphRangesDefaultAudioPlugin() {
-    GlyphRanges ranges;
-    dyn::Assign(ranges,
-                Array {
-                    GlyphRange {0x0020, 0x00FF}, // Basic Latin + Latin Supplement
-                    GlyphRange {0x221E, 0x221E}, // Infinity
-                    GlyphRange {0x2019, 0x2019}, // Apostrophe
-                    GlyphRange {0x2026, 0x2026}, // Ellipsis
-                    GlyphRange {0x203A, 0x203A}, // Single Right-Pointing Angle Quotation Mark
-                    GlyphRange {0x2014, 0x2014}, // Em Dash
-                });
-    return ranges;
+Span<GlyphRange const> FontAtlas::GetGlyphRangesDefaultAudioPlugin() {
+    static constexpr auto k_ranges = Array {
+        GlyphRange {0x0020, 0x00FF}, // Basic Latin + Latin Supplement
+        GlyphRange {0x221E, 0x221E}, // Infinity
+        GlyphRange {0x2019, 0x2019}, // Apostrophe
+        GlyphRange {0x2026, 0x2026}, // Ellipsis
+        GlyphRange {0x203A, 0x203A}, // Single Right-Pointing Angle Quotation Mark
+        GlyphRange {0x2014, 0x2014}, // Em Dash
+    };
+    return k_ranges;
 }
 
 // Retrieve list of range (2 int per range, values are inclusive)
-GlyphRanges FontAtlas::GetGlyphRangesDefault() {
-    GlyphRanges ranges;
-    dyn::Assign(ranges,
-                Array {
-                    GlyphRange {0x0020, 0x00FF}, // Basic Latin + Latin Supplement
-                });
-    return ranges;
+Span<GlyphRange const> FontAtlas::GetGlyphRangesDefault() {
+    static constexpr auto k_ranges = Array {
+        GlyphRange {0x0020, 0x00FF}, // Basic Latin + Latin Supplement
+    };
+    return k_ranges;
 }
 
 //-----------------------------------------------------------------------------

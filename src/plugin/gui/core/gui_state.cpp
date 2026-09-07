@@ -77,7 +77,8 @@ static void CreateFontsIfNeeded(FontAtlas& fonts) {
                     break;
                 case FontType::Icons: {
                     auto const icons_ttf = EmbeddedFontAwesome();
-                    auto constexpr k_icon_ranges = Array {GlyphRange {ICON_MIN_FA, ICON_MAX_FA}};
+                    auto constexpr k_icon_ranges =
+                        Array {GlyphRange {'A', 'Z'}, GlyphRange {ICON_MIN_FA, ICON_MAX_FA}};
                     load_font(icons_ttf, k_font_icons_size, k_icon_ranges);
                     break;
                 }

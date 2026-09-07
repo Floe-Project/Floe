@@ -1110,14 +1110,16 @@ DoMuteSoloButton(GuiState& g, Box parent, DescribedParamValue const& param, bool
         {
             .parent = parent,
             .id_extra = is_solo,
-            .text = is_solo ? "S"_s : "M"_s,
+            .text = is_solo ? ICON_FA_S : ICON_FA_M,
+            .font = FontType::Icons,
+            .font_size = 10,
             .text_colours = state ? Colours {ColSet {
                                         .base = LiveColStruct(UiColMap::MuteSoloButtonTextOn),
                                         .hot = LiveColStruct(UiColMap::MuteSoloButtonTextOnHot),
                                         .active = LiveColStruct(UiColMap::MuteSoloButtonTextOnHot),
                                     }}
                                   : Colours {ColSet {
-                                        .base = LiveColStruct(UiColMap::MidText),
+                                        .base = Col {.c = Col::White, .dark_mode = true, .alpha = 170},
                                         .hot = LiveColStruct(UiColMap::MidTextHot),
                                         .active = LiveColStruct(UiColMap::MidTextHot),
                                     }},

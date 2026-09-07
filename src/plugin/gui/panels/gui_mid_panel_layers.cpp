@@ -62,7 +62,7 @@ void MidPanelLayersContent(GuiBuilder& builder,
             tab_extra_buttons_box,
             {.icon = MidPanelIcon::Shuffle,
              .tooltip =
-                 "Load a random instrument for each layer, as if you clicked each layer's random button individually.\n\nEach layer's randomisation respects its own currently selected filters in the instrument browser."_s});
+                 "Load a random instrument for each layer, as if you clicked each layer's random button individually.\n\nEach layer's randomisation respects its own currently selected filters in the Instrument Browser."_s});
 
         if (rand_btn.button_fired) {
             Array<Optional<sample_lib::InstrumentId>, k_num_layers> new_ids {};

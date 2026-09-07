@@ -302,7 +302,7 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                         .contents_align = layout::Alignment::Start,
                         .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                     },
-                    .tooltip = active ? "Open instrument browser"_s : "Choose an instrument"_s,
+                    .tooltip = active ? "Open the Instrument Browser"_s : "Choose an instrument"_s,
                     .button_behaviour = imgui::ButtonConfig {},
                 });
 

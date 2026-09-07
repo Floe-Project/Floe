@@ -217,7 +217,8 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                     f32 padding_x,
                                     Col colour = {.c = Col::Subtext1, .dark_mode = true},
                                     u64 id_extra = SourceLocationHash(),
-                                    bool disabled = false) {
+                                    bool disabled = false,
+                                    TooltipString value_popup = k_nullopt) {
         // We use a wrapper so that the interactable area is larger and touches the adjacent buttons.
         auto const button = DoBox(builder,
                                   {
@@ -227,6 +228,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                           .size = layout::k_hug_contents,
                                           .contents_padding = {.lr = padding_x, .tb = 3},
                                       },
+                                      .value_popup = value_popup,
                                       .tooltip = tooltip,
                                       .button_behaviour = imgui::ButtonConfig {},
                                   });
@@ -281,18 +283,8 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                     .size = {layout::k_fill_parent, k_font_body_size + k_font_body_italic_size},
                     .contents_direction = layout::Direction::Column,
                 },
-                .tooltip = FunctionRef<String()> {[&arena = builder.arena, &engine = g.engine]() -> String {
-                    DynamicArray<char> buffer {arena};
-                    dyn::Assign(buffer, "Open presets window"_s);
-                    fmt::Append(buffer,
-                                "\nCurrent preset: {}",
-                                engine.pinned_snapshot.state.extras.display_name);
-                    if (engine.pinned_snapshot.state.metadata.description.size) {
-                        dyn::AppendSpan(buffer, "\n\n"_s);
-                        dyn::AppendSpan(buffer, engine.pinned_snapshot.state.metadata.description);
-                    }
-                    return buffer.ToOwnedSpan();
-                }},
+                .tooltip =
+                    "Open the Preset Browser, where you can choose from all the presets installed.\n\nThis area shows the name of the current preset, with a short description underneath. If you've changed anything since loading it, the name is marked as '(modified)'. Tip: the COMPARE toggle on the PERFORM page lets you flick between the original preset and your modified version."_s,
                 .button_behaviour = imgui::ButtonConfig {},
             });
 
@@ -415,7 +407,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             auto const preset_next =
                 do_icon_button(preset_box,
                                ICON_FA_CARET_LEFT,
-                               "Load previous preset\n\nThis is based on the currently selected filters."_s,
+                               "Load the previous preset.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
                                1.0f,
                                3);
             if (preset_next.button_fired) {
@@ -442,7 +434,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             auto const preset_prev =
                 do_icon_button(preset_box,
                                ICON_FA_CARET_RIGHT,
-                               "Load next preset\n\nThis is based on the currently selected filters."_s,
+                               "Load the next preset.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
                                1.0f,
                                3);
             if (preset_prev.button_fired) {
@@ -466,12 +458,13 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
         }
 
         {
-            auto const preset_random =
-                do_icon_button(preset_box,
-                               ICON_FA_SHUFFLE,
-                               "Load a random preset\n\nThis is based on the currently selected filters."_s,
-                               0.9f,
-                               3);
+            auto const preset_random = do_icon_button(
+                preset_box,
+                ICON_FA_SHUFFLE,
+                "Load a random preset from your current selection.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
+                0.9f,
+                3);
             if (preset_random.button_fired) {
                 PresetBrowserContext context {
                     .sample_library_server = g.shared_engine_systems.sample_library_server,
@@ -493,17 +486,22 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
         }
 
         {
-            auto const preset_save = do_icon_button(preset_box,
-                                                    ICON_FA_FLOPPY_DISK,
-                                                    "Save the current state as a preset"_s,
-                                                    0.8f,
-                                                    3);
+            auto const preset_save = do_icon_button(
+                preset_box,
+                ICON_FA_FLOPPY_DISK,
+                "Open the save panel.\n\nFrom there you can set the preset's name, tags, description and other details, then either overwrite the existing preset or save it as a new file."_s,
+                0.8f,
+                3);
             if (preset_save.button_fired) g.imgui.OpenModalViewport(g.save_preset_panel_state.k_panel_id);
         }
 
         {
-            auto const preset_load =
-                do_icon_button(preset_box, ICON_FA_FILE_IMPORT, "Load a preset from a file"_s, 0.8f, 3);
+            auto const preset_load = do_icon_button(
+                preset_box,
+                ICON_FA_FILE_IMPORT,
+                "Open a file browser to load a preset file from anywhere on your computer. The file doesn't need to be in one of Floe's preset folders."_s,
+                0.8f,
+                3);
             if (preset_load.button_fired)
                 OpenFilePickerLoadPreset(g.file_picker_state,
                                          g.shared_engine_systems.paths,
@@ -522,18 +520,23 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
 
     // preferences
     {
-        auto const prefs_button =
-            do_icon_button(right_icon_buttons_container, ICON_FA_GEAR, "Open preferences window"_s, 0.9f, 5);
+        auto const prefs_button = do_icon_button(
+            right_icon_buttons_container,
+            ICON_FA_GEAR,
+            "Open the Preferences window.\n\nPreferences are settings for Floe itself rather than for your sound: how the interface looks, which folders Floe scans for libraries and presets, and where you install packages of sample libraries and presets. They're saved on your computer and apply to every instance of Floe."_s,
+            0.9f,
+            5);
         if (prefs_button.button_fired) g.imgui.OpenModalViewport(g.preferences_panel_state.k_panel_id);
     }
 
-    // performance configuration
+    // performance controls
     {
-        auto const perf_config_button = do_icon_button(right_icon_buttons_container,
-                                                       ICON_FA_SLIDERS,
-                                                       "Open performance configuration window"_s,
-                                                       0.9f,
-                                                       5);
+        auto const perf_config_button = do_icon_button(
+            right_icon_buttons_container,
+            ICON_FA_SLIDERS,
+            "Open the Performance Controls window.\n\nPerformance Controls shape how you play Floe: mostly MIDI settings, plus options for making performances exactly reproducible. They're saved with this instance of Floe in your DAW project. Loading a preset never changes them, so you can set up your MIDI controls once and flick through presets freely."_s,
+            0.9f,
+            5);
         if (perf_config_button.button_fired)
             g.imgui.OpenModalViewport(g.performance_controls_panel_state.k_panel_id);
     }
@@ -541,34 +544,39 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
     {
         auto const can_undo = g.engine.undo_history.CanUndo();
         auto const next = g.engine.undo_history.NextUndoName();
-        auto const tooltip =
+        auto const value_popup =
             next ? (String)fmt::Format(builder.arena, "Undo: {}", *next) : "Nothing to undo"_s;
-        auto const undo_button =
-            do_icon_button(right_icon_buttons_container,
-                           ICON_FA_ARROW_ROTATE_LEFT,
-                           tooltip,
-                           0.9f,
-                           5,
-                           Col {.c = Col::Subtext1, .dark_mode = true, .alpha = can_undo ? (u8)255 : (u8)60},
-                           SourceLocationHash(),
-                           !can_undo);
+        auto const undo_button = do_icon_button(
+            right_icon_buttons_container,
+            ICON_FA_ARROW_ROTATE_LEFT,
+            fmt::Format(
+                builder.arena,
+                "Undo your most recent change.\n\nFloe keeps a history of changes to its sound, including parameter tweaks and loading instruments or effects, going back up to {} steps. That means you can experiment freely and step back at any point. As with most undo systems, making a new change after undoing clears the redo history.",
+                k_undo_max_entries),
+            0.9f,
+            5,
+            Col {.c = Col::Subtext1, .dark_mode = true, .alpha = can_undo ? (u8)255 : (u8)60},
+            SourceLocationHash(),
+            !can_undo,
+            value_popup);
         if (undo_button.button_fired && can_undo) Undo(g.engine);
     }
 
     {
         auto const can_redo = g.engine.undo_history.CanRedo();
         auto const next = g.engine.undo_history.NextRedoName();
-        auto const tooltip =
+        auto const value_popup =
             next ? (String)fmt::Format(builder.arena, "Redo: {}", *next) : "Nothing to redo"_s;
-        auto const redo_button =
-            do_icon_button(right_icon_buttons_container,
-                           ICON_FA_ARROW_ROTATE_RIGHT,
-                           tooltip,
-                           0.9f,
-                           5,
-                           Col {.c = Col::Subtext1, .dark_mode = true, .alpha = can_redo ? (u8)255 : (u8)60},
-                           SourceLocationHash(),
-                           !can_redo);
+        auto const redo_button = do_icon_button(
+            right_icon_buttons_container,
+            ICON_FA_ARROW_ROTATE_RIGHT,
+            "Redo the change you just undid.\n\nRedo is only available after using undo. If you make a new change instead, the redo history is cleared."_s,
+            0.9f,
+            5,
+            Col {.c = Col::Subtext1, .dark_mode = true, .alpha = can_redo ? (u8)255 : (u8)60},
+            SourceLocationHash(),
+            !can_redo,
+            value_popup);
         if (redo_button.button_fired && can_redo) Redo(g.engine);
     }
 
@@ -597,7 +605,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
 
         auto const dots_button = do_icon_button(right_icon_buttons_container,
                                                 ICON_FA_ELLIPSIS_VERTICAL,
-                                                "Additional functions and information"_s,
+                                                "Open the Main Menu, with more options and information."_s,
                                                 1.0f,
                                                 6);
         if (g.show_new_version_indicator) {

@@ -400,8 +400,8 @@ static void DoImpulseResponseSelector(GuiState& g,
         btn_row,
         {
             .greyed_out = greyed_out,
-            .prev_tooltip = "Previous IR.\n\nThis is based on the currently selected filters."_s,
-            .next_tooltip = "Next IR.\n\nThis is based on the currently selected filters."_s,
+            .prev_tooltip = "Load the previous IR.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
+            .next_tooltip = "Load the next IR.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
         });
     if (prev_next.prev_fired) LoadAdjacentIr(context, g.ir_browser_state, SearchDirection::Backward);
     if (prev_next.next_fired) LoadAdjacentIr(context, g.ir_browser_state, SearchDirection::Forward);
@@ -411,7 +411,7 @@ static void DoImpulseResponseSelector(GuiState& g,
         g.builder,
         btn_row,
         {.icon = MidPanelIcon::Shuffle,
-         .tooltip = "Load a random IR.\n\nThis is based on the currently selected filters."_s,
+         .tooltip = "Load a random IR from your current selection.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
          .greyed_out = greyed_out});
     if (shuffle_btn.button_fired) LoadRandomIr(context, g.ir_browser_state);
 

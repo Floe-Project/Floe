@@ -7,6 +7,13 @@
 #include "gui/elements/gui_element_drawing.hpp"
 #include "gui_framework/gui_builder.hpp"
 
+#define BROWSER_FILTERS_TOOLTIP_NOTE(browser_name)                                                           \
+    "This follows the filters you've set in the " browser_name                                               \
+    ", such as the selected library, tags or search text."
+#define PRESET_BROWSER_FILTERS_TOOLTIP_NOTE     BROWSER_FILTERS_TOOLTIP_NOTE("Preset Browser")
+#define INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE BROWSER_FILTERS_TOOLTIP_NOTE("Instrument Browser")
+#define IR_BROWSER_FILTERS_TOOLTIP_NOTE         BROWSER_FILTERS_TOOLTIP_NOTE("IR Browser")
+
 namespace prefs {
 struct Preferences;
 }

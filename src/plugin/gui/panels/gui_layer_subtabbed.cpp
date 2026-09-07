@@ -422,9 +422,8 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
         g.builder,
         nav_box,
         {
-            .prev_tooltip =
-                "Load the previous instrument\n\nThis is based on the currently selected filters."_s,
-            .next_tooltip = "Load the next instrument\n\nThis is based on the currently selected filters."_s,
+            .prev_tooltip = "Load the previous instrument.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
+            .next_tooltip = "Load the next instrument.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
         });
 
     auto const make_browser_context = [&]() -> InstBrowserContext {
@@ -455,7 +454,9 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
         g.builder,
         nav_box,
         {.icon = MidPanelIcon::Shuffle,
-         .tooltip = "Load a random instrument.\n\nThis is based on the currently selected filters."_s});
+         .tooltip =
+             "Load a random instrument from your current selection.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE
+             ""_s});
     if (shuffle_btn.button_fired) {
         auto context = make_browser_context();
         LoadRandomInstrument(context, g.inst_browser_state[layer_index]);

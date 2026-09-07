@@ -747,7 +747,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                 .tooltip = FunctionRef<String()> {[&]() -> String {
                     return fmt::Format(
                         builder.arena,
-                        "Peak level of the audio leaving Floe, measured after the Master Volume. Each bar is one stereo channel. The meter flashes red if the signal clips above 0 dB.\n\n{}",
+                        "Level of the audio leaving Floe, measured after the Master Volume. The meter flashes red if the signal clips above 0 dB.\n\n{}",
                         PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options).tooltip);
                 }},
             });

@@ -3258,7 +3258,7 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Volume"_s,
             .gui_label = "Volume"_s,
-            .tooltip = "Layer volume"_s,
+            .tooltip = "The Layer Volume sets the level of this layer."_s,
         };
         lp(Mute) = Args {
             .id = id(region, 1), // never change

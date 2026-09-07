@@ -57,6 +57,54 @@ static bool IsMultisampledInstrument(LayerProcessor const& layer) {
     return false;
 }
 
+enum class MultisampleDisplay : u8 { Representative, LastPlayed, Paused };
+
+static Optional<String> WaveformTooltipText(LayerProcessor const& layer,
+                                            MultisampleDisplay multisample_display) {
+#define WAVEFORM_INTRO "The waveform display. "
+#define VOICE_MARKERS  "The red markers are voices, each one tracking through the sample as it plays."_s
+#define MULTISAMPLE_INTRO                                                                                     \
+    WAVEFORM_INTRO                                                                                            \
+        "This Instrument contains many samples, and the one you hear depends on which note you play and how " \
+        "hard. "
+
+    switch (layer.instrument.tag) {
+        case InstrumentType::None: return k_nullopt;
+        case InstrumentType::WaveformSynth:
+            return WAVEFORM_INTRO
+                "This layer's Instrument is a built-in waveform rather than a sampled sound, so this shows its shape."_s;
+        case InstrumentType::Sampler: {
+            auto const& inst = *layer.instrument.GetFromTag<InstrumentType::Sampler>();
+            switch (inst.instrument.category) {
+                case sample_lib::SamplerCategory::Empty: return k_nullopt;
+                case sample_lib::SamplerCategory::SingleSample:
+                    return WAVEFORM_INTRO
+                        "This is the sample that this layer's Instrument plays. " VOICE_MARKERS;
+                case sample_lib::SamplerCategory::Sliced:
+                    return WAVEFORM_INTRO
+                        "This is the sample that this layer's Instrument plays, with vertical lines marking where it's divided into slices for tempo-synced playback. " VOICE_MARKERS;
+                case sample_lib::SamplerCategory::Multisample:
+                    switch (multisample_display) {
+                        case MultisampleDisplay::Representative:
+                            return MULTISAMPLE_INTRO
+                                "Until you play a note, this shows a representative sample chosen by the library. " VOICE_MARKERS;
+                        case MultisampleDisplay::LastPlayed:
+                            return MULTISAMPLE_INTRO
+                                "This shows the sample from the most recently played note. " VOICE_MARKERS;
+                        case MultisampleDisplay::Paused:
+                            return MULTISAMPLE_INTRO
+                                "Notes are changing too quickly to follow, so the display is paused on a recent sample until things settle. " VOICE_MARKERS;
+                    }
+            }
+        }
+    }
+    return k_nullopt;
+
+#undef WAVEFORM_INTRO
+#undef VOICE_MARKERS
+#undef MULTISAMPLE_INTRO
+}
+
 // Sweep diagonal lines across the rect.
 static void DrawHatchPattern(DrawList& draw_list, Rect r, u32 col, f32 spacing, f32 thickness) {
     if ((col & k_alpha_mask) == 0) return;
@@ -848,8 +896,26 @@ void DoWaveformElement(GuiState& g,
                                  WwToPixels(1.0f));
             }
 
-            // Multisample indicator: small eye icon in the top-right corner with a tooltip
-            // disambiguating "Last Played" vs "Representative".
+            // Whole-waveform tooltip. Registered before the controls so that hovering a handle takes
+            // priority.
+            {
+                auto const multisample_display = ({
+                    auto d = MultisampleDisplay::Representative;
+                    if (debounce.locked)
+                        d = MultisampleDisplay::Paused;
+                    else if (last_activated_hash)
+                        d = MultisampleDisplay::LastPlayed;
+                    d;
+                });
+                if (auto const tooltip_text = WaveformTooltipText(layer, multisample_display)) {
+                    auto const id = g.imgui.MakeId("waveform");
+                    g.imgui.RegisterRectForMouseTracking(window_r, false);
+                    g.imgui.SetHot(window_r, id);
+                    Tooltip(g, id, window_r, {.tooltip = *tooltip_text});
+                }
+            }
+
+            // Multisample indicator: small eye icon in the top-right corner.
             if (is_multisample) {
                 auto const icon_pad = WwToPixels(4.0f);
                 auto const icon_size = WwToPixels(11.0f);
@@ -858,29 +924,18 @@ void DoWaveformElement(GuiState& g,
                                             icon_size,
                                             icon_size}};
 
-                {
-                    g.fonts.Push(g.fonts.atlas[ToInt(FontType::Icons)]);
-                    DEFER { g.fonts.Pop(); };
-                    auto icon_col = FromU32(LiveCol(UiColMap::WaveformMultisampleBadgeText));
-                    icon_col.a = (u8)(icon_col.a * 0.6f);
-                    g.imgui.draw_list->AddTextInRect(icon_r,
-                                                     ToU32(icon_col),
-                                                     ICON_FA_EYE,
-                                                     {
-                                                         .justification = TextJustification::Centred,
-                                                         .overflow_type = TextOverflowType::AllowOverflow,
-                                                         .font_scaling = 0.7f,
-                                                     });
-                }
-
-                auto const icon_id = g.imgui.MakeId("multisample indicator");
-                g.imgui.RegisterRectForMouseTracking(icon_r, false);
-                g.imgui.SetHot(icon_r, icon_id);
-                String const tooltip_text =
-                    (last_activated_hash && !debounce.locked)
-                        ? "Last-played sample. This instrument contains multiple samples — the one played depends on the note's pitch and velocity."_s
-                        : "Representative sample. This instrument contains multiple samples — the one played depends on the note's pitch and velocity."_s;
-                Tooltip(g, icon_id, icon_r, {.tooltip = tooltip_text});
+                g.fonts.Push(g.fonts.atlas[ToInt(FontType::Icons)]);
+                DEFER { g.fonts.Pop(); };
+                auto icon_col = FromU32(LiveCol(UiColMap::WaveformMultisampleBadgeText));
+                icon_col.a = (u8)(icon_col.a * 0.6f);
+                g.imgui.draw_list->AddTextInRect(icon_r,
+                                                 ToU32(icon_col),
+                                                 ICON_FA_EYE,
+                                                 {
+                                                     .justification = TextJustification::Centred,
+                                                     .overflow_type = TextOverflowType::AllowOverflow,
+                                                     .font_scaling = 0.7f,
+                                                 });
             }
 
             // Slice markers: thin vertical lines on the waveform at slice boundaries.

@@ -310,7 +310,10 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                         .contents_align = layout::Alignment::Start,
                         .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                     },
-                    .tooltip = active ? "Open the Instrument Browser"_s : "Choose an Instrument"_s,
+                    .tooltip =
+                        active
+                            ? "Open the Instrument Browser to choose a different Instrument for this layer. The Instrument is the sound source that this layer plays.\n\nAlso shown, in italics, is the library or folder it comes from."_s
+                            : "Open the Instrument Browser to choose an Instrument for this layer. The Instrument is the sound source that this layer plays.\n\nThis layer is silent until it has an Instrument."_s,
                     .button_behaviour = imgui::ButtonConfig {},
                 });
 
@@ -436,7 +439,10 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                     }}}
                                           : TooltipString {k_nullopt},
                     .tooltip = active ? TooltipString {FunctionRef<String()> {[&]() -> String {
-                        return PeakMeterTooltipText(builder.arena, layer.peak_meter, options).tooltip;
+                        return fmt::Format(
+                            builder.arena,
+                            "Level of this layer's output.\n\n{}",
+                            PeakMeterTooltipText(builder.arena, layer.peak_meter, options).tooltip);
                     }}}
                                       : TooltipString {k_nullopt},
                 });

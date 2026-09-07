@@ -116,7 +116,11 @@ MeterTooltipText PeakMeterTooltipText(ArenaAllocator& arena,
     auto const db = 20 * Log10(Max(raw, f32x2 {0.0000000001f}));
 
     DynamicArray<char> buf {arena};
-    fmt::Append(buf, "Display range: {.0} to {.0} dB", options.min_db, options.max_db);
+    fmt::Append(
+        buf,
+        "This is a stereo peak meter, showing the loudest moment of the signal.\n\nDisplay range: {.0} to {.0} dB",
+        options.min_db,
+        options.max_db);
     if (options.show_db_markers) fmt::Append(buf, "\nLines every: {.0} dB", options.marker_interval_db);
     if (options.show_warning_zones)
         fmt::Append(buf, "\nYellow region: {.0} to {.0} dB", options.yellow_zone_min_db, 0.0f);

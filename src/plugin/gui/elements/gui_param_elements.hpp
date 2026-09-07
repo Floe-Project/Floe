@@ -144,7 +144,12 @@ bool DoResetSectionMenuItems(GuiState& g,
                              String name,
                              bool no_icon_gap = true);
 
+// Help text: the parameter's description plus any editing hints.
 String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena, bool greyed_out = false);
+
+// Value readout: just the value for a single parameter, "Label: value" lines for several.
+String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocator& arena);
+String ParamValuePopupText(DescribedParamValue const& param, ArenaAllocator& arena);
 
 void AddParamContextMenuBehaviour(GuiState& g, Rect window_r, imgui::Id id, DescribedParamValue const& param);
 void AddParamContextMenuBehaviour(GuiState& g,
@@ -156,24 +161,15 @@ void AddParamContextMenuBehaviour(GuiState& g, Box const& box, DescribedParamVal
 
 void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const> params);
 
-// avoid_r: region the tooltip is placed outside of. If nullopt, uses window_r.
-void DoParameterTooltipIfNeeded(GuiState& g,
-                                DescribedParamValue const& param,
-                                imgui::Id imgui_id,
-                                Rect window_r,
-                                Optional<Rect> avoid_r = k_nullopt);
-void DoParameterTooltipIfNeeded(GuiState& g,
-                                Span<DescribedParamValue const*> param,
-                                imgui::Id imgui_id,
-                                Rect window_r,
-                                Optional<Rect> avoid_r = k_nullopt);
-void ParameterValuePopup(GuiState& g,
-                         DescribedParamValue const& param,
-                         imgui::Id id,
-                         Rect window_r,
-                         Optional<Rect> avoid_r = k_nullopt);
-void ParameterValuePopup(GuiState& g,
-                         Span<DescribedParamValue const*> params,
-                         imgui::Id id,
-                         Rect window_r,
-                         Optional<Rect> avoid_r = k_nullopt);
+// Value popup and tooltip for custom IMGUI parameter controls (envelope grabbers, waveform handles, etc.).
+// avoid_r: region the popups are placed outside of. If nullopt, uses window_r.
+void ParameterTooltip(GuiState& g,
+                      DescribedParamValue const& param,
+                      imgui::Id imgui_id,
+                      Rect window_r,
+                      Optional<Rect> avoid_r = k_nullopt);
+void ParameterTooltip(GuiState& g,
+                      Span<DescribedParamValue const*> params,
+                      imgui::Id imgui_id,
+                      Rect window_r,
+                      Optional<Rect> avoid_r = k_nullopt);

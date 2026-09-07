@@ -416,18 +416,22 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                 .gap_px = 1,
                 .show_warning_zones = false,
             };
-            auto const meter_box =
-                DoBox(builder,
-                      {
-                          .parent = meter_and_level_box,
-                          .layout {
-                              .size = {6, layout::k_fill_parent},
-                          },
-                          .tooltip = active ? TooltipString {FunctionRef<String()> {[&]() -> String {
-                              return PeakMeterTooltipText(builder.arena, layer.peak_meter, options);
-                          }}}
-                                            : TooltipString {k_nullopt},
-                      });
+            auto const meter_box = DoBox(
+                builder,
+                {
+                    .parent = meter_and_level_box,
+                    .layout {
+                        .size = {6, layout::k_fill_parent},
+                    },
+                    .value_popup = active ? TooltipString {FunctionRef<String()> {[&]() -> String {
+                        return PeakMeterTooltipText(builder.arena, layer.peak_meter, options).value_popup;
+                    }}}
+                                          : TooltipString {k_nullopt},
+                    .tooltip = active ? TooltipString {FunctionRef<String()> {[&]() -> String {
+                        return PeakMeterTooltipText(builder.arena, layer.peak_meter, options).tooltip;
+                    }}}
+                                      : TooltipString {k_nullopt},
+                });
             if (active) {
                 if (auto const r = BoxRect(builder, meter_box))
                     DrawPeakMeter(g.imgui, g.imgui.ViewportRectToWindowRect(*r), &layer.peak_meter, options);

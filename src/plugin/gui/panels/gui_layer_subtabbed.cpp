@@ -618,10 +618,17 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
                                          .layout {
                                              .size = {k_peak_meter_standard_width, k_vol_slider_height},
                                          },
+                                         .value_popup = FunctionRef<String()> {[&]() -> String {
+                                             return PeakMeterTooltipText(g.builder.arena,
+                                                                         layer_processor.peak_meter,
+                                                                         peak_meter_options)
+                                                 .value_popup;
+                                         }},
                                          .tooltip = FunctionRef<String()> {[&]() -> String {
                                              return PeakMeterTooltipText(g.builder.arena,
                                                                          layer_processor.peak_meter,
-                                                                         peak_meter_options);
+                                                                         peak_meter_options)
+                                                 .tooltip;
                                          }},
                                      });
         if (auto const r = BoxRect(g.builder, meter_box))
@@ -2159,7 +2166,7 @@ HarmonySelectionMenu(GuiState& g, LayerProcessor& layer, Box parent, HarmonyInte
                                     g.fonts.Pop();
 
                                     auto const tooltip_name = HarmonyIntervalName(semitones, g.scratch_arena);
-                                    Tooltip(g, id, cell_r, tooltip_name, {});
+                                    Tooltip(g, id, cell_r, {.value_popup = tooltip_name});
                                 };
 
                                 // Positive rows: +48 to +1 (top-left = 48, descending)

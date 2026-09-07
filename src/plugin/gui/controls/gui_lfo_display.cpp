@@ -145,9 +145,15 @@ static void DoLfoDisplayDrag(GuiState& g,
     AddParamContextMenuBehaviour(g, window_r, id, Array {amount_param, rate_param});
 
     DescribedParamValue const* popup_params[] = {&amount_param, &rate_param};
-    ParameterValuePopup(g, popup_params, id, window_r);
-
-    Tooltip(g, id, window_r, "Drag left/right for time, up/down for amount"_s, {});
+    Tooltip(g,
+            id,
+            window_r,
+            {
+                .value_popup = FunctionRef<String()> {[&]() -> String {
+                    return ParamValuePopupText(popup_params, g.scratch_arena);
+                }},
+                .tooltip = "Drag left/right for time, up/down for amount"_s,
+            });
 }
 
 void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out) {

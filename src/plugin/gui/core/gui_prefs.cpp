@@ -15,7 +15,17 @@ prefs::Descriptor SettingDescriptor(GuiPreference setting) {
                 .value_requirements = prefs::ValueType::Bool,
                 .default_value = true,
                 .gui_label = "Show tooltips",
-                .long_description = "Show descriptions when hovering over controls.",
+                .long_description =
+                    "Show help descriptions after hovering over a control for a moment. Value readouts are always shown.",
+            };
+        case GuiPreference::InstantValueReadouts:
+            return {
+                .key = prefs::key::k_instant_value_readouts,
+                .value_requirements = prefs::ValueType::Bool,
+                .default_value = true,
+                .gui_label = "Instant value readouts",
+                .long_description =
+                    "Show a control's value as soon as the mouse is over it. When off, the value is shown only after a moment or while the control is held down.",
             };
         case GuiPreference::HighContrastGui:
             return {

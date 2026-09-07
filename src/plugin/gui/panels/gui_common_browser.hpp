@@ -361,6 +361,7 @@ struct FilterButtonCommonOptions {
     u64 id_extra;
     bool is_selected;
     String text;
+    TooltipString value_popup = k_nullopt;
     TooltipString tooltip = k_nullopt;
     FilterSelection& filter;
     u64 clicked_key;
@@ -520,6 +521,7 @@ struct BrowserItemOptions {
     Box parent;
     u64 id_extra {};
     String text;
+    TooltipString value_popup = k_nullopt;
     TooltipString tooltip = k_nullopt;
     u64 item_id;
     bool is_current;

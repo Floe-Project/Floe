@@ -1337,41 +1337,45 @@ static void DoEffectParams(GuiState& g,
                                               },
                                           });
 
-            auto const do_meter_column =
-                [&](u64 index, String label, auto draw, FunctionRef<String()> tooltip, bool gr = false) {
-                    auto const column =
-                        DoBox(g.builder,
-                              {
-                                  .parent = meters_row,
-                                  .id_extra = index,
-                                  .layout {
-                                      .size = {!gr ? k_peak_meter_standard_width : 9, layout::k_hug_contents},
-                                      .contents_gap = 3,
-                                      .contents_direction = layout::Direction::Column,
-                                  },
-                              });
-                    auto const meter_box = DoBox(g.builder,
-                                                 {
-                                                     .parent = column,
-                                                     .layout {
-                                                         .size = {layout::k_fill_parent, 40},
-                                                     },
-                                                     .tooltip = tooltip,
-                                                 });
-                    if (auto const r = BoxRect(g.builder, meter_box))
-                        draw(g.imgui.ViewportRectToWindowRect(*r));
+            auto const do_meter_column = [&](u64 index,
+                                             String label,
+                                             auto draw,
+                                             FunctionRef<MeterTooltipText()> text,
+                                             bool gr = false) {
+                auto const column =
                     DoBox(g.builder,
                           {
-                              .parent = column,
-                              .text = label,
-                              .text_colours = greyed_out ? Colours {LiveColStruct(UiColMap::MidTextDimmed)}
-                                                         : Colours {LiveColStruct(UiColMap::MidText)},
-                              .text_justification = TextJustification::Centred,
+                              .parent = meters_row,
+                              .id_extra = index,
                               .layout {
-                                  .size = {layout::k_fill_parent, k_font_body_size},
+                                  .size = {!gr ? k_peak_meter_standard_width : 9, layout::k_hug_contents},
+                                  .contents_gap = 3,
+                                  .contents_direction = layout::Direction::Column,
                               },
                           });
-                };
+                auto const meter_box = DoBox(
+                    g.builder,
+                    {
+                        .parent = column,
+                        .layout {
+                            .size = {layout::k_fill_parent, 40},
+                        },
+                        .value_popup = FunctionRef<String()> {[&]() -> String { return text().value_popup; }},
+                        .tooltip = FunctionRef<String()> {[&]() -> String { return text().tooltip; }},
+                    });
+                if (auto const r = BoxRect(g.builder, meter_box)) draw(g.imgui.ViewportRectToWindowRect(*r));
+                DoBox(g.builder,
+                      {
+                          .parent = column,
+                          .text = label,
+                          .text_colours = greyed_out ? Colours {LiveColStruct(UiColMap::MidTextDimmed)}
+                                                     : Colours {LiveColStruct(UiColMap::MidText)},
+                          .text_justification = TextJustification::Centred,
+                          .layout {
+                              .size = {layout::k_fill_parent, k_font_body_size},
+                          },
+                      });
+            };
 
             // The input level at which limiting starts: whatever the Gain param pushes up to the ceiling.
             auto const in_options = DrawPeakMeterOptions {
@@ -1388,7 +1392,7 @@ static void DoEffectParams(GuiState& g,
                 0,
                 "In"_s,
                 [&](Rect r) { DrawPeakMeter(g.imgui, r, &limiter.limiter_dsp.input_peak_meter, in_options); },
-                [&]() -> String {
+                [&]() -> MeterTooltipText {
                     return PeakMeterTooltipText(g.builder.arena,
                                                 limiter.limiter_dsp.input_peak_meter,
                                                 in_options);
@@ -1402,7 +1406,9 @@ static void DoEffectParams(GuiState& g,
                 1,
                 "GR"_s,
                 [&](Rect r) { DrawGainReductionMeter(g.imgui, r, gr_options); },
-                [&]() -> String { return GainReductionMeterTooltipText(g.builder.arena, gr_options); },
+                [&]() -> MeterTooltipText {
+                    return GainReductionMeterTooltipText(g.builder.arena, gr_options);
+                },
                 true);
 
             auto const out_options = DrawPeakMeterOptions {
@@ -1421,7 +1427,7 @@ static void DoEffectParams(GuiState& g,
                 [&](Rect r) {
                     DrawPeakMeter(g.imgui, r, &limiter.limiter_dsp.output_peak_meter, out_options);
                 },
-                [&]() -> String {
+                [&]() -> MeterTooltipText {
                     return PeakMeterTooltipText(g.builder.arena,
                                                 limiter.limiter_dsp.output_peak_meter,
                                                 out_options);

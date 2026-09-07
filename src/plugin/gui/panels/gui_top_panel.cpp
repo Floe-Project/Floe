@@ -709,8 +709,13 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                       .layout {
                           .size = {k_peak_meter_standard_width, layout::k_fill_parent},
                       },
+                      .value_popup = FunctionRef<String()> {[&]() -> String {
+                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options)
+                              .value_popup;
+                      }},
                       .tooltip = FunctionRef<String()> {[&]() -> String {
-                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options);
+                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options)
+                              .tooltip;
                       }},
                   });
         if (auto const viewport_r = BoxRect(builder, peak_meter_box))
@@ -735,18 +740,22 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
         };
 
-        auto const container = DoBox(builder,
-                                     {
-                                         .parent = meter_box,
-                                         .layout {
-                                             .size = {layout::k_hug_contents, layout::k_fill_parent},
-                                             .contents_gap = 4,
-                                             .contents_direction = layout::Direction::Row,
-                                         },
-                                         .tooltip = FunctionRef<String()> {[&]() -> String {
-                                             return LoudnessMeterTooltipText(builder.arena, loudness_options);
-                                         }},
-                                     });
+        auto const container =
+            DoBox(builder,
+                  {
+                      .parent = meter_box,
+                      .layout {
+                          .size = {layout::k_hug_contents, layout::k_fill_parent},
+                          .contents_gap = 4,
+                          .contents_direction = layout::Direction::Row,
+                      },
+                      .value_popup = FunctionRef<String()> {[&]() -> String {
+                          return LoudnessMeterTooltipText(builder.arena, loudness_options).value_popup;
+                      }},
+                      .tooltip = FunctionRef<String()> {[&]() -> String {
+                          return LoudnessMeterTooltipText(builder.arena, loudness_options).tooltip;
+                      }},
+                  });
 
         if (auto const viewport_r = BoxRect(builder,
                                             DoBox(builder,

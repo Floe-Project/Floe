@@ -137,8 +137,6 @@ void GuiState::OnEngineChange() {
     OnEngineStateChange(save_preset_panel_state, engine);
 }
 
-bool Tooltip(GuiState& g, imgui::Id id, Rect r, char const* fmt, ...);
-
 static void DoResizeCorner(GuiState& g) {
     auto& imgui = g.imgui;
     auto const& frame_input = GuiIo().in;
@@ -213,6 +211,8 @@ void GuiUpdate(GuiState& g) {
     BeginFrame(g.builder,
                {
                    .show_tooltips = prefs::GetBool(g.prefs, SettingDescriptor(GuiPreference::ShowTooltips)),
+                   .instant_value_popups =
+                       prefs::GetBool(g.prefs, SettingDescriptor(GuiPreference::InstantValueReadouts)),
                    .draw_tooltip = DrawOverlayTooltipForRect,
                    .draw_drop_shadow = DrawDropShadow,
                });

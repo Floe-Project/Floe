@@ -815,6 +815,9 @@ void Context::BeginFrame(ViewportConfig cfg, Fonts& fonts) {
     } else {
         time_when_turned_hot = TimePoint {};
     }
+    if (immediate_tooltip_item != k_null_id && hot_item != immediate_tooltip_item &&
+        active_item.id != immediate_tooltip_item && active_item_last_frame.id != immediate_tooltip_item)
+        immediate_tooltip_item = k_null_id;
     keyboard_focus_item = temp_keyboard_focus_item;
     temp_keyboard_focus_item = k_null_id;
     temp_keyboard_focus_item_is_popup = false;
@@ -2548,7 +2551,13 @@ Context::DraggerResult Context::DraggerBehaviour(DraggerBehaviourArgs const& arg
     return result;
 }
 
-f32 Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
+static f32 TooltipFadeIn(f64 seconds_visible, f64 fade_secs) {
+    auto const fade = (f32)Clamp(seconds_visible / fade_secs, 0.0, 1.0);
+    if (fade < 1) GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+    return 1 - ((1 - fade) * (1 - fade));
+}
+
+Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
     SetHot(rect_in_window_coords, id);
     RegisterRectForMouseTracking(rect_in_window_coords);
 
@@ -2558,15 +2567,25 @@ f32 Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
     if (WasJustMadeHot(id))
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_delay_secs);
 
-    if (!IsHot(id)) return 0;
+    TooltipOpacities result {};
+
+    // WasJustDeactivated bridges the frame between releasing a drag and becoming hot again.
+    if (IsHot(id) || IsActive(id) || WasJustDeactivated(id)) {
+        if (immediate_tooltip_item != id) {
+            immediate_tooltip_item = id;
+            time_immediate_tooltip_started = GuiIo().in.current_time;
+        }
+        result.immediate =
+            TooltipFadeIn(GuiIo().in.current_time - time_immediate_tooltip_started, k_fade_secs);
+    }
+
+    if (!IsHot(id)) return result;
 
     auto const seconds_visible = SecondsSpentHot() - k_delay_secs;
-    if (seconds_visible < 0) return 0;
+    if (seconds_visible < 0) return result;
 
-    auto const fade = (f32)Clamp(seconds_visible / k_fade_secs, 0.0, 1.0);
-    if (fade < 1) GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
-
-    return 1 - ((1 - fade) * (1 - fade));
+    result.delayed = TooltipFadeIn(seconds_visible, k_fade_secs);
+    return result;
 }
 
 } // namespace imgui

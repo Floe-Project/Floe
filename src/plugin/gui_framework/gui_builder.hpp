@@ -113,15 +113,19 @@ enum class GuiBuilderPass : u8 {
 
 enum class TooltipJustification : u8 { AboveOrBelow, LeftOrRight };
 
+// Two boxes: the value popup (regular font, nearest the element) and the tooltip (italic, stacked beside
+// the value popup). Either is skipped when its opacity is 0.
 struct DrawTooltipArgs {
     Rect r; // The rect that opened the tooltip.
     Rect avoid_r; // The rect to avoid when placing the tooltip;
     TooltipJustification justification;
-    f32 opacity = 1;
+    String value_popup {};
+    f32 value_popup_opacity = 0;
+    String tooltip {};
+    f32 tooltip_opacity = 0;
 };
 using DrawOverlayTooltipForRectFunc = void(imgui::Context const& imgui,
                                            Fonts& fonts,
-                                           String str,
                                            DrawTooltipArgs const& args);
 using DrawDropShadowFunc = void(imgui::Context const& imgui, Rect r, Optional<f32> rounding, f32 opacity);
 
@@ -161,6 +165,7 @@ struct GuiBuilder {
 
     struct Config {
         bool show_tooltips;
+        bool instant_value_popups;
         DrawOverlayTooltipForRectFunc* draw_tooltip;
         DrawDropShadowFunc* draw_drop_shadow;
     };
@@ -268,7 +273,13 @@ struct BoxConfig {
 
     layout::ItemOptions layout {}; // Don't set parent here, use BoxConfig::parent instead.
 
+    // Shown immediately while hovered or dragged, regardless of preferences. For information the UI doesn't
+    // otherwise show: a knob's value, a meter's level, a preset's description.
+    TooltipString value_popup = k_nullopt;
+    // Help text. Shown in italics after the mouse rests on the element, only if the show-tooltips
+    // preference is on. Placed beside the value popup when both are present.
     TooltipString tooltip = k_nullopt;
+    // Placement options below apply to both boxes.
     imgui::Id tooltip_avoid_viewport_id = 0; // 0 = avoid nothing.
     Box const* tooltip_avoid_box = nullptr; // Tooltip is placed outside the visible part of this box.
     TooltipJustification tooltip_justification = TooltipJustification::AboveOrBelow;
@@ -286,3 +297,13 @@ NO_UBSAN Box DoBox(GuiBuilder& builder, BoxConfig const& config, u64 loc_hash = 
 // isn't provided by BoxConfig, such as: drag behaviour, text input, adding multiple click-modes (right click,
 // middle-click).
 Optional<Rect> BoxRect(GuiBuilder& builder, Box const& box);
+
+// For custom IMGUI elements that aren't boxes. Same semantics as BoxConfig::value_popup and
+// BoxConfig::tooltip. Returns true if anything was drawn.
+struct TooltipArgs {
+    TooltipString value_popup = k_nullopt;
+    TooltipString tooltip = k_nullopt;
+    Optional<Rect> avoid_r {}; // Window coords. If nullopt, uses the element's rect.
+    TooltipJustification justification = TooltipJustification::AboveOrBelow;
+};
+bool Tooltip(GuiBuilder& builder, imgui::Id id, Rect rect_in_window_coords, TooltipArgs const& args);

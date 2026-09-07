@@ -364,14 +364,12 @@ static void InstBrowserItems(GuiBuilder& builder, InstBrowserContext& context, I
                     .parent = folder_section->Do(builder).Get<Box>(),
                     .id_extra = inst_hash,
                     .text = inst.name,
-                    .tooltip = FunctionRef<String()>([&]() -> String {
+                    .value_popup = FunctionRef<String()>([&]() -> String {
                         DynamicArray<char> buf {builder.arena};
 
-                        dyn::AppendSpan(buf, "Click to load the instrument.");
+                        if (inst.description) fmt::Append(buf, "{}\n\n", inst.description);
 
-                        if (inst.description) fmt::Append(buf, "\n\n{}", inst.description);
-
-                        fmt::Append(buf, "\n\nTags: ");
+                        fmt::Append(buf, "Tags: ");
                         if (!inst.tags.AnyValuesSet())
                             fmt::Append(buf, "None");
                         else {
@@ -387,6 +385,7 @@ static void InstBrowserItems(GuiBuilder& builder, InstBrowserContext& context, I
 
                         return buf.ToOwnedSpan();
                     }),
+                    .tooltip = "Click to load the instrument."_s,
                     .item_id = inst_hash,
                     .is_current = is_current,
                     .is_favourite = is_favourite,

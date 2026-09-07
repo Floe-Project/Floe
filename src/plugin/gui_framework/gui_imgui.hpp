@@ -647,10 +647,13 @@ struct Context {
     // Tooltip behaviour
     //
 
-    // Returns the opacity that a tooltip for the given ID should be drawn with; 0 means don't draw one. The
-    // tooltip fades in after the mouse has rested on the element for a moment. Probably use overlay draw-list
-    // for drawing tooltips.
-    f32 TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id);
+    // Opacities that tooltips for the given ID should be drawn with; 0 means don't draw one. Probably use
+    // overlay draw-list for drawing tooltips.
+    struct TooltipOpacities {
+        f32 immediate; // Quickly fades in while the element is hot or active.
+        f32 delayed; // Fades in after the mouse has rested on the element for a moment. 0 while active.
+    };
+    TooltipOpacities TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id);
 
     //
     // Viewports
@@ -910,6 +913,10 @@ struct Context {
     Id temp_hot_item = k_null_id;
     CursorType temp_hot_item_cursor {};
     TimePoint time_when_turned_hot = {};
+
+    // Persists across hot -> active -> released so the fade doesn't restart when a drag ends.
+    Id immediate_tooltip_item = k_null_id;
+    TimePoint time_immediate_tooltip_started = {};
 
     Id hovered_item = k_null_id;
     Id temp_hovered_item = k_null_id;

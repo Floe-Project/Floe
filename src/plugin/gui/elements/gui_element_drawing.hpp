@@ -130,10 +130,7 @@ void DrawPeakMeter(imgui::Context& imgui,
                    StereoPeakMeter const* level,
                    DrawPeakMeterOptions const& options);
 
-void DrawOverlayTooltipForRect(imgui::Context const& imgui,
-                               Fonts& fonts,
-                               String str,
-                               DrawTooltipArgs const& args);
+void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTooltipArgs const& args);
 
 void DrawMidPanelScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars);
 

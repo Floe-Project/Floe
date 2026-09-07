@@ -336,8 +336,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
             // the waveform you're editing.
             auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
             auto param_obj = g.engine.processor.main_params.DescribedValue(*tooltip_param);
-            ParameterValuePopup(g, param_obj, id, grabber_r, avoid_r);
-            DoParameterTooltipIfNeeded(g, param_obj, id, grabber_r, avoid_r);
+            ParameterTooltip(g, param_obj, id, grabber_r, avoid_r);
         }
     };
 
@@ -495,22 +494,16 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 auto const xfade_param = g.engine.processor.main_params.DescribedValue(xfade_param_id);
                 DescribedParamValue const* param_ptrs[] = {&start_param, &end_param, &xfade_param};
 
-                auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
-                ParameterValuePopup(g, param_ptrs, loop_region_id, loop_region_r, avoid_r);
-
-                auto value_string = [](DescribedParamValue const& p) {
-                    return *p.info.LinearValueToString(p.LinearValue());
-                };
                 Tooltip(g,
                         loop_region_id,
                         loop_region_r,
-                        fmt::Format(g.scratch_arena,
-                                    "Loop Start: {}\nLoop End: {}\nCrossfade Size: {}\n"
-                                    "Drag to move the loop, keeping its length and crossfade",
-                                    value_string(start_param),
-                                    value_string(end_param),
-                                    value_string(xfade_param)),
-                        {.avoid_r = avoid_r});
+                        {
+                            .value_popup = FunctionRef<String()> {[&]() -> String {
+                                return ParamValuePopupText(param_ptrs, g.scratch_arena);
+                            }},
+                            .tooltip = "Drag to move the loop, keeping its length and crossfade"_s,
+                            .avoid_r = g.imgui.ViewportRectToWindowRect(r),
+                        });
             }
         }
 
@@ -886,7 +879,7 @@ void DoWaveformElement(GuiState& g,
                     (last_activated_hash && !debounce.locked)
                         ? "Last-played sample. This instrument contains multiple samples — the one played depends on the note's pitch and velocity."_s
                         : "Representative sample. This instrument contains multiple samples — the one played depends on the note's pitch and velocity."_s;
-                Tooltip(g, icon_id, icon_r, tooltip_text, {});
+                Tooltip(g, icon_id, icon_r, {.tooltip = tooltip_text});
             }
 
             // Slice markers: thin vertical lines on the waveform at slice boundaries.

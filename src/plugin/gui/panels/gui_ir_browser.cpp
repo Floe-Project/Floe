@@ -218,15 +218,13 @@ void IrBrowserItems(GuiBuilder& builder, IrBrowserContext& context, IrBrowserSta
                                   .parent = folder_section->Do(builder).Get<Box>(),
                                   .id_extra = ir_hash,
                                   .text = ir.name,
-                                  .tooltip = FunctionRef<String()>([&]() -> String {
+                                  .value_popup = FunctionRef<String()>([&]() -> String {
                                       DynamicArray<char> buffer {builder.arena};
 
-                                      dyn::AppendSpan(buffer, "Click to load the IR.");
-
                                       if (ir.description && ir.description->size)
-                                          fmt::Append(buffer, "\n\n{}", *ir.description);
+                                          fmt::Append(buffer, "{}\n\n", *ir.description);
 
-                                      dyn::AppendSpan(buffer, "\n\nTags: ");
+                                      dyn::AppendSpan(buffer, "Tags: ");
                                       if (ir.tags.AnyValuesSet()) {
                                           bool first = true;
                                           ir.tags.ForEachSetBit([&](usize bit) {
@@ -242,6 +240,7 @@ void IrBrowserItems(GuiBuilder& builder, IrBrowserContext& context, IrBrowserSta
 
                                       return buffer.ToOwnedSpan();
                                   }),
+                                  .tooltip = "Click to load the IR."_s,
                                   .item_id = ir_hash,
                                   .is_current = is_current,
                                   .is_favourite = is_favourite,

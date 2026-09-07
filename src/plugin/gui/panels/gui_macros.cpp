@@ -412,8 +412,10 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
                         g,
                         badge_imgui_id,
                         badge_r,
-                        "Targets a legacy parameter — kept for DAW automation. Macro modulation will only be audible while the legacy override is active."_s,
-                        {});
+                        {
+                            .tooltip =
+                                "Targets a legacy parameter — kept for DAW automation. Macro modulation will only be audible while the legacy override is active."_s,
+                        });
 
                     builder.imgui.overlay_draw_list->AddCircleFilled(
                         badge_r.Centre(),
@@ -531,11 +533,12 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
 
                             DrawOverlayTooltipForRect(g.imgui,
                                                       g.fonts,
-                                                      text,
                                                       {
                                                           .r = window_r,
                                                           .avoid_r = window_r,
                                                           .justification = TooltipJustification::AboveOrBelow,
+                                                          .value_popup = text,
+                                                          .value_popup_opacity = 1,
                                                       });
                         });
                 }

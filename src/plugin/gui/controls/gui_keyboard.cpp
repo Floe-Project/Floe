@@ -281,7 +281,8 @@ InternalKeyboardGui(GuiState& g, Rect r, s32 starting_octave, s8 num_octaves) {
         overlay_key(this_abs_key, key_r, UiColMap::KeyboardNaturalVoiceOverlay);
         draw_keyswitch_marker(this_abs_key, key_r, false);
 
-        if (this_abs_key == keyswitch_note && imgui.IsHot(id)) Tooltip(g, id, key_r, "Reset keyswitch"_s, {});
+        if (this_abs_key == keyswitch_note && imgui.IsHot(id))
+            Tooltip(g, id, key_r, {.tooltip = "Reset keyswitch"_s});
 
         // Show the octave number if it's middle-C.
         if (this_abs_key == 60) {
@@ -382,7 +383,8 @@ InternalKeyboardGui(GuiState& g, Rect r, s32 starting_octave, s8 num_octaves) {
         overlay_key(this_abs_key, key_r, UiColMap::KeyboardSharpVoiceOverlay);
         draw_keyswitch_marker(this_abs_key, key_r, true);
 
-        if (this_abs_key == keyswitch_note && imgui.IsHot(id)) Tooltip(g, id, key_r, "Reset keyswitch"_s, {});
+        if (this_abs_key == keyswitch_note && imgui.IsHot(id))
+            Tooltip(g, id, key_r, {.tooltip = "Reset keyswitch"_s});
     }
     imgui.PopId();
 
@@ -503,12 +505,13 @@ static void RenderTopDisplayContent(GuiState& g, TopDisplayOptions const& option
             Tooltip(g,
                     strip_id,
                     strip_r,
-                    fmt::Format(g.scratch_arena,
-                                "Layer {}'s playable range: {} to {}",
-                                layer_idx + 1,
-                                NoteName(range_start),
-                                NoteName(range_finish)),
-                    {.ignore_show_tooltips_preference = true});
+                    {
+                        .value_popup = (String)fmt::Format(g.scratch_arena,
+                                                           "Layer {}'s playable range: {} to {}",
+                                                           layer_idx + 1,
+                                                           NoteName(range_start),
+                                                           NoteName(range_finish)),
+                    });
         }
 
         auto const container_left = strip_r.x;
@@ -671,14 +674,16 @@ static void RenderTopDisplayContent(GuiState& g, TopDisplayOptions const& option
                         Tooltip(g,
                                 capsule_id,
                                 capsule_rect,
-                                fmt::Format(g.scratch_arena,
-                                            "{}: {} to {}. From {} on Layer {}.",
-                                            named_range.name,
-                                            NoteName(CheckedCast<u7>(named_range.key_range.start)),
-                                            NoteName(CheckedCast<u7>(named_range.key_range.end - 1)),
-                                            g.engine.Layer(layer_idx).InstName(),
-                                            layer_idx + 1),
-                                {.ignore_show_tooltips_preference = true});
+                                {
+                                    .value_popup = (String)fmt::Format(
+                                        g.scratch_arena,
+                                        "{}: {} to {}. From {} on Layer {}.",
+                                        named_range.name,
+                                        NoteName(CheckedCast<u7>(named_range.key_range.start)),
+                                        NoteName(CheckedCast<u7>(named_range.key_range.end - 1)),
+                                        g.engine.Layer(layer_idx).InstName(),
+                                        layer_idx + 1),
+                                });
                     }
 
                     if (!fade_in && !fade_out) {

@@ -11,21 +11,21 @@ namespace prefs {
 struct Preferences;
 }
 
-struct TooltipOptions {
-    Optional<Rect> avoid_r {}; // If nullopt, uses the window_r.
-    bool ignore_show_tooltips_preference = false;
-    TooltipJustification justification = TooltipJustification::AboveOrBelow;
-};
-bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, String str, TooltipOptions const& options);
+bool Tooltip(GuiState& g, imgui::Id id, Rect window_r, TooltipArgs const& args);
 
 // Text builders for meter tooltips. Callers construct the same DrawXOptions struct they pass to the
 // corresponding Draw* function and pass it here too, so the drawn ranges and the tooltip text can never
 // disagree.
-String PeakMeterTooltipText(ArenaAllocator& arena,
-                            StereoPeakMeter const& level,
-                            DrawPeakMeterOptions const& options);
-String GainReductionMeterTooltipText(ArenaAllocator& arena, DrawGainReductionMeterOptions const& options);
-String LoudnessMeterTooltipText(ArenaAllocator& arena, DrawLoudnessMeterOptions const& options);
+struct MeterTooltipText {
+    String value_popup; // Current reading.
+    String tooltip; // What the drawn ranges mean.
+};
+MeterTooltipText PeakMeterTooltipText(ArenaAllocator& arena,
+                                      StereoPeakMeter const& level,
+                                      DrawPeakMeterOptions const& options);
+MeterTooltipText GainReductionMeterTooltipText(ArenaAllocator& arena,
+                                               DrawGainReductionMeterOptions const& options);
+MeterTooltipText LoudnessMeterTooltipText(ArenaAllocator& arena, DrawLoudnessMeterOptions const& options);
 
 constexpr f32 k_mid_button_height = 22.4f;
 

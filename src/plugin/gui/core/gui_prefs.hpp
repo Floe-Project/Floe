@@ -8,6 +8,7 @@
 enum class GuiPreference : u8 {
     WindowWidth,
     ShowTooltips,
+    InstantValueReadouts,
     HighContrastGui,
     ShowInstanceName,
     ShowLufsMeter,

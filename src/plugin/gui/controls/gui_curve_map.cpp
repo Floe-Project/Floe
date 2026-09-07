@@ -38,14 +38,7 @@ DrawCurvedSegment(DrawList& graphics, f32x2 p0, f32x2 p1, float curve_value, int
 }
 
 // x is velocity 0-1, y is the curve's 0-1 output which gets squared before being used as an amplitude.
-static void CurvePointValuePopup(GuiState& g,
-                                 imgui::Id id,
-                                 MouseButton mouse_button,
-                                 Rect window_r,
-                                 Rect avoid_r,
-                                 f32x2 point) {
-    if (!g.imgui.IsActive(id, mouse_button)) return;
-
+static String CurvePointValueText(GuiState& g, f32x2 point) {
     auto const uses_fractional_velocity =
         g.engine.processor.uses_fractional_velocity_values.Load(LoadMemoryOrder::Relaxed);
     auto const velocity_str = uses_fractional_velocity
@@ -56,15 +49,7 @@ static void CurvePointValuePopup(GuiState& g,
     auto const volume_str = amp > k_silence_amp_80 ? fmt::Format(g.scratch_arena, "{.1} dB", AmpToDb(amp))
                                                    : g.scratch_arena.Clone("-∞ dB"_s);
 
-    DrawOverlayTooltipForRect(
-        g.imgui,
-        g.fonts,
-        fmt::Format(g.scratch_arena, "Velocity: {}\nVolume: {}", velocity_str, volume_str),
-        {
-            .r = window_r,
-            .avoid_r = avoid_r,
-            .justification = TooltipJustification::AboveOrBelow,
-        });
+    return fmt::Format(g.scratch_arena, "Velocity: {}\nVolume: {}", velocity_str, volume_str);
 }
 
 void DoCurveMap(GuiState& g,
@@ -184,8 +169,12 @@ void DoCurveMap(GuiState& g,
             Tooltip(g,
                     imgui_id,
                     region_rect,
-                    fmt::Format(g.scratch_arena, "Double-click to add point.\n\n{}", additional_tooltip),
-                    {.avoid_r = popup_avoid_r});
+                    {
+                        .tooltip = (String)fmt::Format(g.scratch_arena,
+                                                       "Double-click to add point.\n\n{}",
+                                                       additional_tooltip),
+                        .avoid_r = popup_avoid_r,
+                    });
 
             // Double-click to add point
             if (imgui.ButtonBehaviour(region_rect,
@@ -297,10 +286,13 @@ void DoCurveMap(GuiState& g,
                 Tooltip(g,
                         imgui_id,
                         curve_shaper_rect,
-                        fmt::Format(g.scratch_arena,
-                                    "Drag to change curve. Double-click to add point.\n\n{}",
-                                    additional_tooltip),
-                        {.avoid_r = popup_avoid_r});
+                        {
+                            .tooltip =
+                                (String)fmt::Format(g.scratch_arena,
+                                                    "Drag to change curve. Double-click to add point.\n\n{}",
+                                                    additional_tooltip),
+                            .avoid_r = popup_avoid_r,
+                        });
 
                 // Double-click to add point
                 if (imgui.ButtonBehaviour(curve_shaper_rect,
@@ -451,14 +443,6 @@ void DoCurveMap(GuiState& g,
                 changed_values = true;
             }
 
-            CurvePointValuePopup(g,
-                                 imgui_id,
-                                 drag_activation_cfg.mouse_button,
-                                 grabber_rect,
-                                 popup_avoid_r,
-                                 f32x2 {curve_map.points[(usize)working_point.real_index].x,
-                                        curve_map.points[(usize)working_point.real_index].y});
-
             draw_list.AddCircleFilled(pos,
                                       point_radius,
                                       imgui.IsHotOrActive(imgui_id, drag_activation_cfg.mouse_button)
@@ -466,13 +450,22 @@ void DoCurveMap(GuiState& g,
                                           : point_color,
                                       12);
 
-            Tooltip(g,
-                    imgui_id,
-                    grabber_rect,
-                    fmt::Format(g.scratch_arena,
-                                "Drag to move point. Double-click to remove point.\n\n{}",
-                                additional_tooltip),
-                    {.avoid_r = popup_avoid_r});
+            Tooltip(
+                g,
+                imgui_id,
+                grabber_rect,
+                {
+                    .value_popup = FunctionRef<String()> {[&]() -> String {
+                        return CurvePointValueText(
+                            g,
+                            f32x2 {curve_map.points[(usize)working_point.real_index].x,
+                                   curve_map.points[(usize)working_point.real_index].y});
+                    }},
+                    .tooltip = (String)fmt::Format(g.scratch_arena,
+                                                   "Drag to move point. Double-click to remove point.\n\n{}",
+                                                   additional_tooltip),
+                    .avoid_r = popup_avoid_r,
+                });
         }
     }
 

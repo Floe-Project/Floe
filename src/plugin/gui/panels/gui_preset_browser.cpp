@@ -486,55 +486,55 @@ void PresetBrowserItems(GuiBuilder& builder, PresetBrowserContext& context, Pres
                     .parent = folder_section->Do(builder).Get<Box>(),
                     .id_extra = preset.full_path_hash,
                     .text = preset.name,
-                    .tooltip = FunctionRef<String()>([&preset,
-                                                      &scratch = builder.arena,
-                                                      &frame_context = context.frame_context]() -> String {
-                        DynamicArray<char> buffer {scratch};
+                    .value_popup =
+                        FunctionRef<String()>([&preset,
+                                               &scratch = builder.arena,
+                                               &frame_context = context.frame_context]() -> String {
+                            DynamicArray<char> buffer {scratch};
 
-                        dyn::AppendSpan(buffer, "Click to load the preset."_s);
+                            if (preset.metadata.description.size)
+                                fmt::Append(buffer, "{}\n\n", preset.metadata.description);
 
-                        if (preset.metadata.description.size)
-                            fmt::Append(buffer, "\n\n{}", preset.metadata.description);
-
-                        dyn::AppendSpan(buffer, "\n\nTags: ");
-                        if (preset.metadata.tags.AnyValuesSet()) {
-                            bool first = true;
-                            preset.metadata.tags.ForEachSetBit([&](usize bit) {
-                                if (!first) dyn::AppendSpan(buffer, ", ");
-                                first = false;
-                                dyn::AppendSpan(buffer, GetTagInfo((TagType)bit).name);
-                            });
-                        } else {
-                            dyn::AppendSpan(buffer, "none");
-                        }
-
-                        if (preset.used_libraries.size) {
-                            dyn::AppendSpan(buffer, "\n\nRequires libraries: ");
-                            for (auto const [library, _] : preset.used_libraries) {
-                                auto const maybe_lib = frame_context.lib_table.Find(library);
-                                if (!maybe_lib || !*maybe_lib) {
-                                    auto const lib_name =
-                                        sample_lib::LookupLibraryIdString(library).ValueOr("Unknown"_s);
-                                    fmt::Append(buffer, "{} (not installed)", lib_name);
-                                } else
-                                    dyn::AppendSpan(buffer, (*maybe_lib)->name);
-                                if (preset.used_libraries.size == 2)
-                                    dyn::AppendSpan(buffer, " and ");
-                                else
-                                    dyn::AppendSpan(buffer, ", ");
+                            dyn::AppendSpan(buffer, "Tags: ");
+                            if (preset.metadata.tags.AnyValuesSet()) {
+                                bool first = true;
+                                preset.metadata.tags.ForEachSetBit([&](usize bit) {
+                                    if (!first) dyn::AppendSpan(buffer, ", ");
+                                    first = false;
+                                    dyn::AppendSpan(buffer, GetTagInfo((TagType)bit).name);
+                                });
+                            } else {
+                                dyn::AppendSpan(buffer, "none");
                             }
-                            if (preset.used_libraries.size == 2)
-                                dyn::Pop(buffer, 5);
-                            else
-                                dyn::Pop(buffer, 2);
-                            dyn::AppendSpan(buffer, ".");
-                        }
 
-                        if (preset.metadata.author.size)
-                            fmt::Append(buffer, "\n\nAuthor: {}.", preset.metadata.author);
+                            if (preset.used_libraries.size) {
+                                dyn::AppendSpan(buffer, "\n\nRequires libraries: ");
+                                for (auto const [library, _] : preset.used_libraries) {
+                                    auto const maybe_lib = frame_context.lib_table.Find(library);
+                                    if (!maybe_lib || !*maybe_lib) {
+                                        auto const lib_name =
+                                            sample_lib::LookupLibraryIdString(library).ValueOr("Unknown"_s);
+                                        fmt::Append(buffer, "{} (not installed)", lib_name);
+                                    } else
+                                        dyn::AppendSpan(buffer, (*maybe_lib)->name);
+                                    if (preset.used_libraries.size == 2)
+                                        dyn::AppendSpan(buffer, " and ");
+                                    else
+                                        dyn::AppendSpan(buffer, ", ");
+                                }
+                                if (preset.used_libraries.size == 2)
+                                    dyn::Pop(buffer, 5);
+                                else
+                                    dyn::Pop(buffer, 2);
+                                dyn::AppendSpan(buffer, ".");
+                            }
 
-                        return buffer.ToOwnedSpan();
-                    }),
+                            if (preset.metadata.author.size)
+                                fmt::Append(buffer, "\n\nAuthor: {}.", preset.metadata.author);
+
+                            return buffer.ToOwnedSpan();
+                        }),
+                    .tooltip = "Click to load the preset."_s,
                     .item_id = preset.full_path_hash,
                     .is_current = is_current,
                     .is_favourite = is_favourite,
@@ -908,16 +908,10 @@ void DoPresetBrowser(GuiBuilder& builder, PresetBrowserContext& context, PresetB
                                         .is_selected = state.common_state.Filter(BrowserFilter::Folder)
                                                            .Contains(folder_hash),
                                         .text = folder_name,
-                                        .tooltip = TooltipString {FunctionRef<String()>(
-                                            [folder, &folder_name, &scratch = builder.arena]() -> String {
-                                                DynamicArray<char> buffer {scratch};
-                                                dyn::AppendSpan(
-                                                    buffer,
-                                                    "Click to expand/collapse the preset bank."_s);
-                                                if (folder->name != folder_name)
-                                                    fmt::Append(buffer, "\n\n{}", folder->name);
-                                                return buffer.ToOwnedSpan();
-                                            })},
+                                        .value_popup = folder->name != folder_name
+                                                           ? TooltipString {folder->name}
+                                                           : TooltipString {k_nullopt},
+                                        .tooltip = "Click to expand/collapse the preset bank."_s,
                                         .filter = state.common_state.Filter(BrowserFilter::Folder),
                                         .clicked_key = folder_hash,
                                         .filter_mode = state.common_state.filter_mode,

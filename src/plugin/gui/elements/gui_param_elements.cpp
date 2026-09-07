@@ -354,12 +354,7 @@ void AddParamContextMenuBehaviour(GuiState& g, Box const& box, DescribedParamVal
 }
 
 String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena, bool greyed_out) {
-    auto const str = param.info.LinearValueToString(param.LinearValue());
-    ASSERT(str);
-
     DynamicArray<char> buf {arena};
-    if (MacroIndexFromParamIndex(param.info.index)) dyn::AppendSpan(buf, "Macro "_s);
-    fmt::Append(buf, "{}: {}\n", param.info.name, str.Value());
     if (greyed_out) fmt::Append(buf, "Not active. ");
     fmt::Append(buf, "{}", param.info.tooltip);
     if (param.info.value_type == ParamValueType::Int)
@@ -420,6 +415,26 @@ static void DoDistortionTypeMenuItems(GuiState& g, ParamIndex param_index) {
     }
 }
 
+String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocator& arena) {
+    if (params.size == 1) return arena.Clone(*params[0]->info.LinearValueToString(params[0]->LinearValue()));
+
+    DynamicArray<char> buf {arena};
+    for (auto param : params) {
+        if (MacroIndexFromParamIndex(param->info.index)) dyn::AppendSpan(buf, "Macro "_s);
+        fmt::Append(buf,
+                    "{}: {}",
+                    param->info.gui_label,
+                    *param->info.LinearValueToString(param->LinearValue()));
+        if (param != Last(params)) dyn::Append(buf, '\n');
+    }
+    return buf.ToOwnedSpan();
+}
+
+String ParamValuePopupText(DescribedParamValue const& param, ArenaAllocator& arena) {
+    auto param_ptr = &param;
+    return ParamValuePopupText({&param_ptr, 1}, arena);
+}
+
 static void DoParamMenuItems(GuiState& g, ParamIndex param_index) {
     auto const menu_root = DoBox(g.builder,
                                  {
@@ -478,8 +493,7 @@ static void DoLegacyOverrideOverlay(GuiState& g, Rect window_r, ParamIndex moder
     Tooltip(g,
             imgui_id,
             badge_r,
-            "Overridden by a legacy parameter — click to open the Legacy Parameters panel"_s,
-            {});
+            {.tooltip = "Overridden by a legacy parameter — click to open the Legacy Parameters panel"_s});
 
     g.fonts.Push(ToInt(FontType::Icons));
     DEFER { g.fonts.Pop(); };
@@ -722,21 +736,26 @@ Box DoKnobParameter(GuiState& g,
         IsAnyLegacyOverriding(param.info.index, g.engine.processor.main_params.values);
     if (legacy_override) options.greyed_out = true;
 
-    auto container = DoBox(g.builder,
-                           {
-                               .parent = parent,
-                               .id_extra = param.info.id,
-                               .layout {
-                                   .size = layout::k_hug_contents,
-                                   .contents_gap = 2,
-                                   .contents_direction = layout::Direction::Column,
-                                   .contents_align = layout::Alignment::Start,
-                               },
-                               .tooltip = FunctionRef<String()> {[&]() -> String {
-                                   if (options.override_tooltip.size) return options.override_tooltip;
-                                   return ParamTooltipText(param, g.builder.arena, options.greyed_out);
-                               }},
-                           });
+    auto container =
+        DoBox(g.builder,
+              {
+                  .parent = parent,
+                  .id_extra = param.info.id,
+                  .layout {
+                      .size = layout::k_hug_contents,
+                      .contents_gap = 2,
+                      .contents_direction = layout::Direction::Column,
+                      .contents_align = layout::Alignment::Start,
+                  },
+                  .value_popup = options.is_fake ? TooltipString {k_nullopt}
+                                                 : TooltipString {FunctionRef<String()> {[&]() -> String {
+                                                       return ParamValuePopupText(param, g.builder.arena);
+                                                   }}},
+                  .tooltip = FunctionRef<String()> {[&]() -> String {
+                      if (options.override_tooltip.size) return options.override_tooltip;
+                      return ParamTooltipText(param, g.builder.arena, options.greyed_out);
+                  }},
+              });
 
     auto val = param.LinearValue();
     auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});
@@ -792,8 +811,6 @@ Box DoKnobParameter(GuiState& g,
 
             if (g.imgui.WasJustDeactivated(container.imgui_id, MouseButton::Left))
                 ParameterJustStoppedMoving(g.engine.processor, param.info.index);
-
-            ParameterValuePopup(g, param, container.imgui_id, window_r);
 
             AddParamContextMenuBehaviour(g, window_r, container.imgui_id, param);
             OverlayMacroDestinationRegion(g, window_r, param.info.index);
@@ -915,18 +932,23 @@ Box DoVerticalSliderParameter(GuiState& g,
         IsAnyLegacyOverriding(param.info.index, g.engine.processor.main_params.values);
     if (legacy_override) options.greyed_out = true;
 
-    auto container = DoBox(g.builder,
-                           {
-                               .parent = parent,
-                               .id_extra = param.info.id,
-                               .layout {
-                                   .size = {options.width, options.height},
-                               },
-                               .tooltip = FunctionRef<String()> {[&]() -> String {
-                                   if (options.override_tooltip.size) return options.override_tooltip;
-                                   return ParamTooltipText(param, g.builder.arena);
-                               }},
-                           });
+    auto container =
+        DoBox(g.builder,
+              {
+                  .parent = parent,
+                  .id_extra = param.info.id,
+                  .layout {
+                      .size = {options.width, options.height},
+                  },
+                  .value_popup = options.is_fake ? TooltipString {k_nullopt}
+                                                 : TooltipString {FunctionRef<String()> {[&]() -> String {
+                                                       return ParamValuePopupText(param, g.builder.arena);
+                                                   }}},
+                  .tooltip = FunctionRef<String()> {[&]() -> String {
+                      if (options.override_tooltip.size) return options.override_tooltip;
+                      return ParamTooltipText(param, g.builder.arena);
+                  }},
+              });
 
     auto val = param.LinearValue();
     Optional<f32> new_val {};
@@ -963,8 +985,6 @@ Box DoVerticalSliderParameter(GuiState& g,
 
             if (g.imgui.WasJustDeactivated(container.imgui_id, MouseButton::Left))
                 ParameterJustStoppedMoving(g.engine.processor, param.info.index);
-
-            ParameterValuePopup(g, param, container.imgui_id, window_r);
 
             AddParamContextMenuBehaviour(g, window_r, container.imgui_id, param);
             OverlayMacroDestinationRegion(g, window_r, param.info.index);
@@ -1500,77 +1520,39 @@ void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const
     }
 }
 
-void ParameterValuePopup(GuiState& g,
-                         DescribedParamValue const& param,
-                         imgui::Id id,
-                         Rect window_r,
-                         Optional<Rect> avoid_r) {
+void ParameterTooltip(GuiState& g,
+                      DescribedParamValue const& param,
+                      imgui::Id imgui_id,
+                      Rect window_r,
+                      Optional<Rect> avoid_r) {
     auto param_ptr = &param;
-    ParameterValuePopup(g, {&param_ptr, 1}, id, window_r, avoid_r);
+    ParameterTooltip(g, {&param_ptr, 1}, imgui_id, window_r, avoid_r);
 }
 
-void ParameterValuePopup(GuiState& g,
-                         Span<DescribedParamValue const*> params,
-                         imgui::Id id,
-                         Rect window_r,
-                         Optional<Rect> avoid_r) {
-    if (!g.imgui.IsActive(id, MouseButton::Left)) return;
-
-    DrawOverlayTooltipForRect(g.imgui,
-                              g.fonts,
-                              ({
-                                  String s = {};
-                                  if (params.size == 1)
-                                      s = g.scratch_arena.Clone(
-                                          *params[0]->info.LinearValueToString(params[0]->LinearValue()));
-                                  else {
-                                      DynamicArray<char> buf {g.scratch_arena};
-                                      for (auto param : params) {
-                                          if (MacroIndexFromParamIndex(param->info.index))
-                                              dyn::AppendSpan(buf, "Macro "_s);
-                                          fmt::Append(buf,
-                                                      "{}: {}",
-                                                      param->info.gui_label,
-                                                      *param->info.LinearValueToString(param->LinearValue()));
-                                          if (param != Last(params)) dyn::Append(buf, '\n');
-                                      }
-                                      s = buf.ToOwnedSpan();
-                                  }
-                                  s;
-                              }),
-                              {
-                                  .r = window_r,
-                                  .avoid_r = avoid_r.ValueOr(window_r),
-                                  .justification = TooltipJustification::AboveOrBelow,
-                              });
-}
-
-void DoParameterTooltipIfNeeded(GuiState& g,
-                                DescribedParamValue const& param,
-                                imgui::Id imgui_id,
-                                Rect param_rect_in_window_coords,
-                                Optional<Rect> avoid_r) {
-    auto param_ptr = &param;
-    DoParameterTooltipIfNeeded(g, {&param_ptr, 1}, imgui_id, param_rect_in_window_coords, avoid_r);
-}
-
-void DoParameterTooltipIfNeeded(GuiState& g,
-                                Span<DescribedParamValue const*> params,
-                                imgui::Id imgui_id,
-                                Rect param_rect_in_window_coords,
-                                Optional<Rect> avoid_r) {
-    DynamicArray<char> buf {g.scratch_arena};
-    for (auto param : params) {
-        auto const str = param->info.LinearValueToString(param->LinearValue());
-        ASSERT(str);
-
-        if (MacroIndexFromParamIndex(param->info.index)) dyn::AppendSpan(buf, "Macro "_s);
-        fmt::Append(buf, "{}: {}\n{}", param->info.name, str.Value(), param->info.tooltip);
-
-        if (param->info.value_type == ParamValueType::Int)
-            fmt::Append(buf, ". Drag to edit or double-click to type a value");
-
-        if (params.size != 1 && param != Last(params)) fmt::Append(buf, "\n\n");
-    }
-    Tooltip(g, imgui_id, param_rect_in_window_coords, buf, {.avoid_r = avoid_r});
+void ParameterTooltip(GuiState& g,
+                      Span<DescribedParamValue const*> params,
+                      imgui::Id imgui_id,
+                      Rect window_r,
+                      Optional<Rect> avoid_r) {
+    Tooltip(g,
+            imgui_id,
+            window_r,
+            {
+                .value_popup = FunctionRef<String()> {[&]() -> String {
+                    return ParamValuePopupText(params, g.scratch_arena);
+                }},
+                .tooltip = FunctionRef<String()> {[&]() -> String {
+                    if (params.size == 1) return ParamTooltipText(*params[0], g.scratch_arena);
+                    DynamicArray<char> buf {g.scratch_arena};
+                    for (auto param : params) {
+                        fmt::Append(buf,
+                                    "{}: {}",
+                                    param->info.gui_label,
+                                    ParamTooltipText(*param, g.scratch_arena));
+                        if (param != Last(params)) fmt::Append(buf, "\n\n");
+                    }
+                    return buf.ToOwnedSpan();
+                }},
+                .avoid_r = avoid_r,
+            });
 }

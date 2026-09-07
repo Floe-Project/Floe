@@ -841,55 +841,116 @@ void DrawOverlayViewportBackground(imgui::Context const& imgui) {
     imgui.draw_list->AddRectFilled(r, ToU32({.c = Col::Background0}), rounding);
 }
 
-void DrawOverlayTooltipForRect(imgui::Context const& imgui,
-                               Fonts& fonts,
-                               String str,
-                               DrawTooltipArgs const& args) {
-    fonts.Push(ToInt(FontType::Body));
+static f32x2 TooltipBoxSize(Fonts& fonts, FontType font, String str, f32 max_text_width, f32x2 text_margin) {
+    fonts.Push(ToInt(font));
+    DEFER { fonts.Pop(); };
+    auto const wrapped_size = fonts.CalcTextSize(str, {.wrap_width = max_text_width});
+    return f32x2 {Min(max_text_width, wrapped_size.x), wrapped_size.y} + (text_margin * 2);
+}
+
+static void DrawTooltipBox(imgui::Context const& imgui,
+                           Fonts& fonts,
+                           FontType font,
+                           String str,
+                           Rect r,
+                           f32x2 text_margin,
+                           f32 opacity) {
+    fonts.Push(ToInt(font));
     DEFER { fonts.Pop(); };
 
-    auto const text_margin = WwToPixels(k_tooltip_pad);
+    DrawDropShadow(imgui, r, k_nullopt, opacity);
+    imgui.overlay_draw_list->AddRectFilled(r,
+                                           ChangeAlpha(ToU32(Col {.c = Col::Background0}), opacity),
+                                           WwToPixels(k_corner_rounding));
+    imgui.overlay_draw_list->AddText(r.pos + text_margin,
+                                     ChangeAlpha(ToU32(Col {.c = Col::Text}), opacity),
+                                     str,
+                                     {.wrap_width = r.w - (text_margin.x * 2) + 1});
+}
 
-    auto max_width = WwToPixels(k_tooltip_max_width);
+void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTooltipArgs const& args) {
+    auto const text_margin = WwToPixels(k_tooltip_pad);
+    auto const window_size = GuiIo().in.window_size.ToFloat2();
+
+    auto max_text_width = WwToPixels(k_tooltip_max_width);
     if (args.justification == TooltipJustification::LeftOrRight) {
-        auto const viewport_width = GuiIo().in.window_size.ToFloat2().x;
-        auto const space_right = viewport_width - args.avoid_r.Right();
+        auto const space_right = window_size.x - args.avoid_r.Right();
         auto const space_left = args.avoid_r.x;
         auto const available_width = Max(space_right, space_left) - (text_margin.x * 2);
-        max_width = Clamp(available_width, WwToPixels(k_tooltip_min_width), max_width);
+        max_text_width = Clamp(available_width, WwToPixels(k_tooltip_min_width), max_text_width);
     }
 
-    auto const wrapped_size = fonts.CalcTextSize(str, {.wrap_width = max_width});
-
-    auto const size = Min(max_width, wrapped_size.x);
-
-    Rect popup_r {
-        .pos = args.r.pos,
-        .size = f32x2 {size, wrapped_size.y} + (text_margin * 2),
+    auto const place_nearest_element = [&](f32x2 size) {
+        Rect popup_r {.pos = args.r.pos, .size = size};
+        if (args.justification == TooltipJustification::AboveOrBelow) {
+            popup_r.y += args.r.h;
+            popup_r.x += (args.r.w / 2) - (popup_r.w / 2);
+        } else {
+            popup_r.y += (args.r.h / 2) - (popup_r.h / 2);
+        }
+        popup_r.pos = imgui::BestPopupPos(popup_r,
+                                          args.avoid_r,
+                                          window_size,
+                                          args.justification == TooltipJustification::LeftOrRight
+                                              ? imgui::PopupJustification::LeftOrRight
+                                              : imgui::PopupJustification::AboveOrBelow);
+        return popup_r;
     };
 
-    if (args.justification == TooltipJustification::AboveOrBelow) {
-        popup_r.y += args.r.h;
-        popup_r.x = popup_r.x + ((args.r.w / 2) - (popup_r.w / 2));
-    } else {
-        popup_r.y = popup_r.y + ((args.r.h / 2) - (popup_r.h / 2));
+    Optional<Rect> value_popup_r {};
+    if (args.value_popup_opacity > 0) {
+        value_popup_r = place_nearest_element(
+            TooltipBoxSize(fonts, FontType::Body, args.value_popup, max_text_width, text_margin));
+        DrawTooltipBox(imgui,
+                       fonts,
+                       FontType::Body,
+                       args.value_popup,
+                       *value_popup_r,
+                       text_margin,
+                       args.value_popup_opacity);
     }
 
-    popup_r.pos = imgui::BestPopupPos(popup_r,
-                                      args.avoid_r,
-                                      GuiIo().in.window_size.ToFloat2(),
-                                      args.justification == TooltipJustification::LeftOrRight
-                                          ? imgui::PopupJustification::LeftOrRight
-                                          : imgui::PopupJustification::AboveOrBelow);
+    if (args.tooltip_opacity > 0) {
+        auto const size =
+            TooltipBoxSize(fonts, FontType::BodyItalic, args.tooltip, max_text_width, text_margin);
 
-    DrawDropShadow(imgui, popup_r, k_nullopt, args.opacity);
+        // Stacked against the value popup on the side away from the element, so the value popup never
+        // moves when the tooltip appears.
+        auto const tooltip_r = ({
+            Rect r;
+            if (value_popup_r) {
+                auto const& v = *value_popup_r;
+                auto const gap = WwToPixels(k_small_gap);
 
-    imgui.overlay_draw_list->AddRectFilled(popup_r,
-                                           ChangeAlpha(ToU32(Col {.c = Col::Background0}), args.opacity),
-                                           WwToPixels(k_corner_rounding));
+                auto const above_y = v.y - gap - size.y;
+                auto const below_y = v.Bottom() + gap;
+                auto place_above = v.Bottom() <= args.avoid_r.y;
+                if (place_above && above_y < 0) place_above = false;
+                if (!place_above && below_y + size.y > window_size.y && above_y >= 0) place_above = true;
 
-    imgui.overlay_draw_list->AddText(popup_r.pos + text_margin,
-                                     ChangeAlpha(ToU32(Col {.c = Col::Text}), args.opacity),
-                                     str,
-                                     {.wrap_width = size + 1});
+                auto x = v.x + (v.w / 2) - (size.x / 2);
+                if (v.x >= args.avoid_r.Right())
+                    x = v.x;
+                else if (v.Right() <= args.avoid_r.x)
+                    x = v.Right() - size.x;
+
+                r = {
+                    .pos = {Clamp(x, 0.0f, Max(0.0f, window_size.x - size.x)),
+                            place_above ? above_y : below_y},
+                    .size = size,
+                };
+            } else {
+                r = place_nearest_element(size);
+            }
+            r;
+        });
+
+        DrawTooltipBox(imgui,
+                       fonts,
+                       FontType::BodyItalic,
+                       args.tooltip,
+                       tooltip_r,
+                       text_margin,
+                       args.tooltip_opacity);
+    }
 }

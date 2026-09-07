@@ -38,13 +38,12 @@ DrawCurvedSegment(DrawList& graphics, f32x2 p0, f32x2 p1, float curve_value, int
 }
 
 // x is velocity 0-1, y is the curve's 0-1 output which gets squared before being used as an amplitude.
-static void
-CurvePointValuePopup(GuiState& g,
-                     imgui::Id id,
-                     MouseButton mouse_button,
-                     Rect window_r,
-                     Rect avoid_r,
-                     f32x2 point) {
+static void CurvePointValuePopup(GuiState& g,
+                                 imgui::Id id,
+                                 MouseButton mouse_button,
+                                 Rect window_r,
+                                 Rect avoid_r,
+                                 f32x2 point) {
     if (!g.imgui.IsActive(id, mouse_button)) return;
 
     auto const uses_fractional_velocity =

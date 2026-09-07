@@ -85,6 +85,26 @@ static void DoDotsMenu(GuiState& g) {
     MenuDivider(g.builder, root);
 
     // Windows
+    if (MenuItem(g.builder,
+                 root,
+                 {
+                     .text = "Preferences",
+                     .tooltip = "Open the Preferences window"_s,
+                 })
+            .button_fired) {
+        g.imgui.OpenModalViewport(g.preferences_panel_state.k_panel_id);
+    }
+
+    if (MenuItem(g.builder,
+                 root,
+                 {
+                     .text = "Performance Controls",
+                     .tooltip = "Open the Performance Controls window"_s,
+                 })
+            .button_fired) {
+        g.imgui.OpenModalViewport(g.performance_controls_panel_state.k_panel_id);
+    }
+
     {
         auto const info_item = MenuItem(g.builder,
                                         root,

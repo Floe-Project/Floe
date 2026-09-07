@@ -400,8 +400,12 @@ static void DoImpulseResponseSelector(GuiState& g,
         btn_row,
         {
             .greyed_out = greyed_out,
-            .prev_tooltip = "Load the previous IR.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
-            .next_tooltip = "Load the next IR.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
+            .prev_tooltip =
+                "Step to the previous IR. A quick way to audition reverb spaces without opening the browser.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
+            .next_tooltip =
+                "Step to the next IR. A quick way to audition reverb spaces without opening the browser.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
         });
     if (prev_next.prev_fired) LoadAdjacentIr(context, g.ir_browser_state, SearchDirection::Backward);
     if (prev_next.next_fired) LoadAdjacentIr(context, g.ir_browser_state, SearchDirection::Forward);
@@ -411,7 +415,9 @@ static void DoImpulseResponseSelector(GuiState& g,
         g.builder,
         btn_row,
         {.icon = MidPanelIcon::Shuffle,
-         .tooltip = "Load a random IR from your current selection.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
+         .tooltip =
+             "Jump to a random IR. A quick way to stumble upon reverb spaces you might not have picked yourself.\n\n" IR_BROWSER_FILTERS_TOOLTIP_NOTE
+             ""_s,
          .greyed_out = greyed_out});
     if (shuffle_btn.button_fired) LoadRandomIr(context, g.ir_browser_state);
 

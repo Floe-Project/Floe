@@ -1948,7 +1948,8 @@ consteval auto CreateParams() {
     };
 
     constexpr String k_macro_tooltip =
-        "A macro that can be assigned to any parameter in the plugin. The macro will affect all parameters that are assigned to it.";
+        "A macro is a single knob that moves one or more other parameters at once. Preset authors usually set these up and give them custom names, so each macro shapes the sound in a way that's tailored to that particular preset.\n\n"
+        "If you want to set up your own, go to the Layers or Effects page and open the MACROS tab in the bottom panel. There you can choose what each macro controls and rename it.";
 
     mp(Macro1) = Args {
         .id = id(IdRegion::Master, 101), // never change
@@ -3266,7 +3267,10 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Mute"_s,
             .gui_label = "Mute"_s,
-            .tooltip = "Mute this layer"_s,
+            .tooltip =
+                "Mute: silence this layer. Handy for hearing how the other layers sit together while you're designing a sound.\n\n"
+                "A muted layer keeps running in the background exactly as if you could hear it, so when you unmute, the sound carries on seamlessly from wherever it has naturally got to. If you're trying to save CPU, unload the Instrument instead.\n\n"
+                "If a layer is still audible after muting it, check whether it's also soloed: Solo takes priority over Mute."_s,
         };
         lp(Solo) = Args {
             .id = id(region, 2), // never change
@@ -3275,7 +3279,10 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Solo"_s,
             .gui_label = "Solo"_s,
-            .tooltip = "Mute all other layers"_s,
+            .tooltip =
+                "Solo: hear this layer on its own. Any layer that isn't soloed goes quiet. Handy for focusing on one part of a sound while you're designing it.\n\n"
+                "Silenced layers keep running in the background exactly as if you could hear them, so when you unsolo, they carry on seamlessly from wherever they have naturally got to. If you're trying to save CPU, unload their Instruments instead.\n\n"
+                "If a layer has gone quiet unexpectedly, check whether another layer is soloed. And if a muted layer is still audible, that's because Solo takes priority over Mute."_s,
         };
         lp(Pan) = Args {
             .id = id(region, 3), // never change

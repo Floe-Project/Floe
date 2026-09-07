@@ -24,6 +24,7 @@ struct ParameterComponentOptions {
     bool bidirectional = false;
     bool is_fake = false;
     bool label = true;
+    String inactive_reason {}; // If greyed_out, shown in the value popup rather than the tooltip.
     String override_tooltip {};
     String override_value_popup {};
     String override_label {};

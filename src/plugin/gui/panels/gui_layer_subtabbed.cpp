@@ -422,8 +422,12 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
         g.builder,
         nav_box,
         {
-            .prev_tooltip = "Load the previous instrument.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
-            .next_tooltip = "Load the next instrument.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
+            .prev_tooltip =
+                "Step to the previous Instrument. A quick way to audition sounds without opening the browser.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
+            .next_tooltip =
+                "Step to the next Instrument. A quick way to audition sounds without opening the browser.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
         });
 
     auto const make_browser_context = [&]() -> InstBrowserContext {
@@ -455,7 +459,7 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
         nav_box,
         {.icon = MidPanelIcon::Shuffle,
          .tooltip =
-             "Load a random instrument from your current selection.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE
+             "Jump to a random Instrument. A quick way to stumble upon sounds you might not have picked yourself.\n\n" INSTRUMENT_BROWSER_FILTERS_TOOLTIP_NOTE
              ""_s});
     if (shuffle_btn.button_fired) {
         auto context = make_browser_context();

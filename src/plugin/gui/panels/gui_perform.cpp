@@ -85,18 +85,20 @@ static void DoPresetInfo(GuiBuilder& builder, GuiState& g, GuiFrameContext const
         }
 
         if (library_name.size) {
-            auto const lib_name_row =
-                DoBox(builder,
-                      {
-                          .parent = container,
-                          .layout {
-                              .size = {layout::k_hug_contents, layout::k_hug_contents},
-                              .contents_gap = 6,
-                              .contents_direction = layout::Direction::Row,
-                              .contents_align = layout::Alignment::Middle,
-                              .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                          },
-                      });
+            auto const lib_name_row = DoBox(
+                builder,
+                {
+                    .parent = container,
+                    .layout {
+                        .size = {layout::k_hug_contents, layout::k_hug_contents},
+                        .contents_gap = 6,
+                        .contents_direction = layout::Direction::Row,
+                        .contents_align = layout::Alignment::Middle,
+                        .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                    },
+                    .tooltip = mixed ? "This preset uses Instruments from more than one sample library."_s
+                                     : "The sample library that this preset's Instruments come from."_s,
+                });
 
             if (!mixed && first_lib_id) {
                 auto const imgs = GetLibraryImages(g.library_images,
@@ -135,19 +137,25 @@ static void DoPresetInfo(GuiBuilder& builder, GuiState& g, GuiFrameContext const
     {
         auto name = snapshot.state.extras.display_name;
         if (name.size) {
-            if (StateModifiedFromPinned(g.engine)) dyn::AppendSpan(name, " (modified)");
-            DoBox(builder,
-                  {
-                      .parent = container,
-                      .text = name,
-                      .wrap_width = k_wrap_to_parent,
-                      .size_from_text = true,
-                      .font = library_name.size && library_name.data != k_mixed_libraries.data
-                                  ? FontType::Heading1
-                                  : FontType::LargeTitle,
-                      .text_colours = Col {.c = Col::White},
-                      .text_justification = TextJustification::Centred,
-                  });
+            auto const modified = StateModifiedFromPinned(g.engine);
+            if (modified) dyn::AppendSpan(name, " (modified)");
+            DoBox(
+                builder,
+                {
+                    .parent = container,
+                    .text = name,
+                    .wrap_width = k_wrap_to_parent,
+                    .size_from_text = true,
+                    .font = library_name.size && library_name.data != k_mixed_libraries.data
+                                ? FontType::Heading1
+                                : FontType::LargeTitle,
+                    .text_colours = Col {.c = Col::White},
+                    .text_justification = TextJustification::Centred,
+                    .tooltip =
+                        modified
+                            ? "The name of the current preset. You've changed something since loading it, so it's marked as '(modified)'. Tip: the COMPARE toggle below lets you flick between the original preset and your modified version."_s
+                            : "The name of the current preset. If you change anything, it'll be marked as '(modified)'."_s,
+                });
         }
     }
 }
@@ -302,7 +310,7 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                         .contents_align = layout::Alignment::Start,
                         .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                     },
-                    .tooltip = active ? "Open the Instrument Browser"_s : "Choose an instrument"_s,
+                    .tooltip = active ? "Open the Instrument Browser"_s : "Choose an Instrument"_s,
                     .button_behaviour = imgui::ButtonConfig {},
                 });
 
@@ -771,6 +779,7 @@ static void DoMacrosColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                                 .width = k_macro_knob_width,
                                 .style_system = GuiStyleSystem::MidPanel,
                                 .greyed_out = !has_destinations,
+                                .inactive_reason = "nothing assigned"_s,
                                 .override_label = g.engine.macro_names[macro_index],
                             });
         }
@@ -912,12 +921,22 @@ void MidPanelPerformContent(GuiBuilder& builder,
             LoadAdjacentPreset(context, g.preset_browser_state, direction);
         };
 
-        auto const prev_btn = do_nav_button(info_row, ICON_FA_CARET_LEFT ""_s, "Previous preset"_s, 0);
+        auto const prev_btn = do_nav_button(
+            info_row,
+            ICON_FA_CARET_LEFT ""_s,
+            "Step to the previous preset. This is a quick way to audition sounds without opening the browser, and works identically to the arrows next to the preset name at the top of Floe.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+            ""_s,
+            0);
         if (prev_btn.button_fired) load_adjacent(SearchDirection::Backward);
 
         DoPresetInfo(builder, g, frame_context, info_row);
 
-        auto const next_btn = do_nav_button(info_row, ICON_FA_CARET_RIGHT ""_s, "Next preset"_s, 1);
+        auto const next_btn = do_nav_button(
+            info_row,
+            ICON_FA_CARET_RIGHT ""_s,
+            "Step to the next preset. This is a quick way to audition sounds without opening the browser, and works identically to the arrows next to the preset name at the top of Floe.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+            ""_s,
+            1);
         if (next_btn.button_fired) load_adjacent(SearchDirection::Forward);
 
         if (prev_btn.is_hot || next_btn.is_hot)
@@ -936,6 +955,7 @@ void MidPanelPerformContent(GuiBuilder& builder,
                                          .margins = {.t = 8},
                                          .contents_padding = {.lr = 8, .tb = 4},
                                      },
+                                     .tooltip = "The folder that this preset lives in."_s,
                                  });
         if (auto const r = BoxRect(builder, badge))
             DrawMidBlurredPanelSurface(g,
@@ -967,18 +987,21 @@ void MidPanelPerformContent(GuiBuilder& builder,
     // Collapse/expand toggle - generous click target with chevron icon at the bottom-centre.
     // The icon is hover-only when expanded, always visible when collapsed.
     {
-        auto const toggle_bar =
-            DoBox(builder,
-                  {
-                      .parent = root,
-                      .layout {
-                          .size = {300, 100},
-                          .contents_align = layout::Alignment::Middle,
-                          .contents_cross_axis_align = layout::CrossAxisAlign::End,
-                      },
-                      .tooltip = collapsed ? "Show bottom panel"_s : "Hide bottom panel"_s,
-                      .button_behaviour = imgui::ButtonConfig {},
-                  });
+        auto const toggle_bar = DoBox(
+            builder,
+            {
+                .parent = root,
+                .layout {
+                    .size = {300, 100},
+                    .contents_align = layout::Alignment::Middle,
+                    .contents_cross_axis_align = layout::CrossAxisAlign::End,
+                },
+                .tooltip =
+                    collapsed
+                        ? "Show the bottom panel again, with the macros, layers and preset description."_s
+                        : "Hide the bottom panel so you can see the library's artwork in full. Click again to bring it back."_s,
+                .button_behaviour = imgui::ButtonConfig {},
+            });
 
         DoBox(builder,
               {

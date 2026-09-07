@@ -53,7 +53,7 @@ static void DoDotsMenu(GuiState& g) {
                  root,
                  {
                      .text = "Load Blank Preset",
-                     .tooltip = "Set all parameters to their default values, clear all instruments and IRs"_s,
+                     .tooltip = "Set all parameters to their default values, clear all Instruments and IRs"_s,
                  })
             .button_fired) {
         SetToDefaultState(g.engine);
@@ -322,7 +322,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                     {
                         .text = "Load Blank Preset",
                         .tooltip =
-                            "Set all parameters to their default values, clear all instruments and IRs"_s,
+                            "Set all parameters to their default values, clear all Instruments and IRs"_s,
                         .no_icon_gap = true,
                     })
                     .button_fired) {
@@ -424,12 +424,13 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
         }
 
         {
-            auto const preset_next =
-                do_icon_button(preset_box,
-                               ICON_FA_CARET_LEFT,
-                               "Load the previous preset.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
-                               1.0f,
-                               3);
+            auto const preset_next = do_icon_button(
+                preset_box,
+                ICON_FA_CARET_LEFT,
+                "Step to the previous preset. A quick way to audition sounds without opening the browser.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
+                1.0f,
+                3);
             if (preset_next.button_fired) {
                 PresetBrowserContext context {
                     .sample_library_server = g.shared_engine_systems.sample_library_server,
@@ -451,12 +452,13 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
         }
 
         {
-            auto const preset_prev =
-                do_icon_button(preset_box,
-                               ICON_FA_CARET_RIGHT,
-                               "Load the next preset.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE ""_s,
-                               1.0f,
-                               3);
+            auto const preset_prev = do_icon_button(
+                preset_box,
+                ICON_FA_CARET_RIGHT,
+                "Step to the next preset. A quick way to audition sounds without opening the browser.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+                ""_s,
+                1.0f,
+                3);
             if (preset_prev.button_fired) {
                 PresetBrowserContext context {
                     .sample_library_server = g.shared_engine_systems.sample_library_server,
@@ -481,7 +483,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             auto const preset_random = do_icon_button(
                 preset_box,
                 ICON_FA_SHUFFLE,
-                "Load a random preset from your current selection.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
+                "Jump to a random preset. A quick way to stumble upon sounds you might not have picked yourself.\n\n" PRESET_BROWSER_FILTERS_TOOLTIP_NOTE
                 ""_s,
                 0.9f,
                 3);
@@ -571,7 +573,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             ICON_FA_ARROW_ROTATE_LEFT,
             fmt::Format(
                 builder.arena,
-                "Undo your most recent change.\n\nFloe keeps a history of changes to its sound, including parameter tweaks and loading instruments or effects, going back up to {} steps. That means you can experiment freely and step back at any point. As with most undo systems, making a new change after undoing clears the redo history.",
+                "Undo your most recent change.\n\nFloe keeps a history of changes to its sound, including parameter tweaks and loading Instruments or effects, going back up to {} steps. That means you can experiment freely and step back at any point..",
                 k_undo_max_entries),
             0.9f,
             5,

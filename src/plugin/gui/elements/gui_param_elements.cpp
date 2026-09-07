@@ -736,26 +736,38 @@ Box DoKnobParameter(GuiState& g,
         IsAnyLegacyOverriding(param.info.index, g.engine.processor.main_params.values);
     if (legacy_override) options.greyed_out = true;
 
-    auto container = DoBox(g.builder,
-                           {
-                               .parent = parent,
-                               .id_extra = param.info.id,
-                               .layout {
-                                   .size = layout::k_hug_contents,
-                                   .contents_gap = 2,
-                                   .contents_direction = layout::Direction::Column,
-                                   .contents_align = layout::Alignment::Start,
-                               },
-                               .value_popup = FunctionRef<String()> {[&]() -> String {
-                                   if (options.override_value_popup.size) return options.override_value_popup;
-                                   if (options.is_fake) return {};
-                                   return ParamValuePopupText(param, g.builder.arena);
-                               }},
-                               .tooltip = FunctionRef<String()> {[&]() -> String {
-                                   if (options.override_tooltip.size) return options.override_tooltip;
-                                   return ParamTooltipText(param, g.builder.arena, options.greyed_out);
-                               }},
-                           });
+    bool const inactive_reason_in_popup =
+        options.greyed_out && !legacy_override && options.inactive_reason.size;
+
+    auto container =
+        DoBox(g.builder,
+              {
+                  .parent = parent,
+                  .id_extra = param.info.id,
+                  .layout {
+                      .size = layout::k_hug_contents,
+                      .contents_gap = 2,
+                      .contents_direction = layout::Direction::Column,
+                      .contents_align = layout::Alignment::Start,
+                  },
+                  .value_popup = FunctionRef<String()> {[&]() -> String {
+                      if (options.override_value_popup.size) return options.override_value_popup;
+                      if (options.is_fake) return {};
+                      auto const text = ParamValuePopupText(param, g.builder.arena);
+                      if (inactive_reason_in_popup)
+                          return fmt::Format(g.builder.arena,
+                                             "{} (inactive: {})",
+                                             text,
+                                             options.inactive_reason);
+                      return text;
+                  }},
+                  .tooltip = FunctionRef<String()> {[&]() -> String {
+                      if (options.override_tooltip.size) return options.override_tooltip;
+                      return ParamTooltipText(param,
+                                              g.builder.arena,
+                                              options.greyed_out && !inactive_reason_in_popup);
+                  }},
+              });
 
     auto val = param.LinearValue();
     auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});

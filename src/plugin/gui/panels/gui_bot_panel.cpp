@@ -277,6 +277,7 @@ static void DoBotPanel(GuiState& g) {
                     {
                         .width = k_small_knob_width,
                         .greyed_out = g.engine.processor.main_macro_destinations[macro_index].Size() == 0,
+                        .inactive_reason = "nothing assigned"_s,
                         .override_label = g.engine.macro_names[macro_index],
                     });
         }

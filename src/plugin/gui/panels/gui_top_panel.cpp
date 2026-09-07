@@ -553,7 +553,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
     {
         auto const perf_config_button = do_icon_button(
             right_icon_buttons_container,
-            ICON_FA_SLIDERS,
+            ICON_FA_GAUGE,
             "Open the Performance Controls window.\n\nPerformance Controls shape how you play Floe: mostly MIDI settings, plus options for making performances exactly reproducible. They're saved with this instance of Floe in your DAW project. Loading a preset never changes them, so you can set up your MIDI controls once and flick through presets freely."_s,
             0.9f,
             5);

@@ -875,11 +875,12 @@ static void DrawTooltipBox(imgui::Context const& imgui,
 void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTooltipArgs const& args) {
     auto const text_margin = WwToPixels(k_tooltip_pad);
     auto const window_size = GuiIo().in.window_size.ToFloat2();
+    auto const avoid_r = args.avoid_r.Expanded(WwToPixels(k_tooltip_avoid_gap));
 
     auto max_text_width = WwToPixels(k_tooltip_max_width);
     if (args.justification == TooltipJustification::LeftOrRight) {
-        auto const space_right = window_size.x - args.avoid_r.Right();
-        auto const space_left = args.avoid_r.x;
+        auto const space_right = window_size.x - avoid_r.Right();
+        auto const space_left = avoid_r.x;
         auto const available_width = Max(space_right, space_left) - (text_margin.x * 2);
         max_text_width = Clamp(available_width, WwToPixels(k_tooltip_min_width), max_text_width);
     }
@@ -893,7 +894,7 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
             popup_r.y += (args.r.h / 2) - (popup_r.h / 2);
         }
         popup_r.pos = imgui::BestPopupPos(popup_r,
-                                          args.avoid_r,
+                                          avoid_r,
                                           window_size,
                                           args.justification == TooltipJustification::LeftOrRight
                                               ? imgui::PopupJustification::LeftOrRight
@@ -928,14 +929,14 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
 
                 auto const above_y = v.y - gap - size.y;
                 auto const below_y = v.Bottom() + gap;
-                auto place_above = v.Bottom() <= args.avoid_r.y;
+                auto place_above = v.Bottom() <= avoid_r.y;
                 if (place_above && above_y < 0) place_above = false;
                 if (!place_above && below_y + size.y > window_size.y && above_y >= 0) place_above = true;
 
                 auto x = v.x + (v.w / 2) - (size.x / 2);
-                if (v.x >= args.avoid_r.Right())
+                if (v.x >= avoid_r.Right())
                     x = v.x;
-                else if (v.Right() <= args.avoid_r.x)
+                else if (v.Right() <= avoid_r.x)
                     x = v.Right() - size.x;
 
                 r = {

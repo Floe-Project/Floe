@@ -377,14 +377,15 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
         auto const start_param_id = ParamIndexFromLayerParamIndex(layer.index, LayerParamIndex::LoopStart);
         auto const end_param_id = ParamIndexFromLayerParamIndex(layer.index, LayerParamIndex::LoopEnd);
 
+        // Reads the loop points fresh from the params rather than the values captured at the start of the
+        // frame, since the caller has just changed them.
         auto set_xfade_size_if_needed = [&]() {
+            auto const new_loop_start = params.LinearValue(layer.index, LayerParamIndex::LoopStart);
+            auto const new_loop_end =
+                Max(params.LinearValue(layer.index, LayerParamIndex::LoopEnd), new_loop_start);
             auto xfade = g.engine.processor.main_params.LinearValue(xfade_param_id);
             auto clamped_xfade =
-                ClampCrossfadeSize(xfade,
-                                   loop_start,
-                                   Max(params.LinearValue(layer.index, LayerParamIndex::LoopEnd), loop_start),
-                                   1.0f,
-                                   *mode.value.mode);
+                ClampCrossfadeSize(xfade, new_loop_start, new_loop_end, 1.0f, *mode.value.mode);
             if (xfade > clamped_xfade) {
                 SetParameterValue(g.engine.processor,
                                   xfade_param_id,

@@ -25,6 +25,7 @@ struct ParameterComponentOptions {
     bool is_fake = false;
     bool label = true;
     String override_tooltip {};
+    String override_value_popup {};
     String override_label {};
     StereoPeakMeter const* peak_meter = nullptr; // If set, draws a peak meter inside the knob.
     Span<f32 const> voice_blips_01 {}; // Per-voice value markers drawn on the highlight arc.

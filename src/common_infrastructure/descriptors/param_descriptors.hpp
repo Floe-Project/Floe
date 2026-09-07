@@ -1921,7 +1921,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Master},
         .name = "Volume"_s,
         .gui_label = "Vol"_s,
-        .tooltip = "Master volume"_s,
+        .tooltip =
+            "The Master Volume is the final stage of Floe's signal chain: it sits after the effects rack, so it sets the overall level of everything just before the audio leaves Floe."_s,
     };
 
     mp(LegacyMasterVelocity) = Args {
@@ -1943,7 +1944,7 @@ consteval auto CreateParams() {
         .name = "Timbre"_s,
         .gui_label = "Timbre"_s,
         .tooltip =
-            "The intstruments timbre. Not every instrument contains timbre information; instruments that do will be highlighted when you click on this knob."_s,
+            "Sweep between an instrument's crossfade layers, such as soft-to-hard or dark-to-bright variations of the same sound.\n\nOnly instruments that were built with crossfade layers respond to this knob; they are highlighted while you drag it. If none of the loaded instruments have crossfade layers, the knob is inactive."_s,
     };
 
     constexpr String k_macro_tooltip =

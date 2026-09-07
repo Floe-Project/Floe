@@ -691,7 +691,8 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                 .override_tooltip =
                     has_insts_with_timbre_layers
                         ? ""_s
-                        : "Timbre: no currently loaded instruments have timbre information; this knob is inactive"_s,
+                        : "Timbre is inactive because none of the loaded instruments have crossfade layers.\n\nSome instruments are made from several layers of samples, such as soft-to-hard or dark-to-bright variations of the same sound. When one of those is loaded, this knob sweeps between its layers so you can shape the tone. Instruments that respond to it are highlighted while you drag the knob."_s,
+                .override_value_popup = has_insts_with_timbre_layers ? ""_s : "Inactive"_s,
                 .voice_blips_01 =
                     VoiceBlips01(g, k_nullopt, param_values::MpeDestination::Timbre, timbre_param),
             });
@@ -730,22 +731,24 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             .marker_interval_db = 6,
             .low_signal_threshold_db = -60.0f,
         };
-        auto const peak_meter_box =
-            DoBox(builder,
-                  {
-                      .parent = meter_box,
-                      .layout {
-                          .size = {k_peak_meter_standard_width, layout::k_fill_parent},
-                      },
-                      .value_popup = FunctionRef<String()> {[&]() -> String {
-                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options)
-                              .value_popup;
-                      }},
-                      .tooltip = FunctionRef<String()> {[&]() -> String {
-                          return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options)
-                              .tooltip;
-                      }},
-                  });
+        auto const peak_meter_box = DoBox(
+            builder,
+            {
+                .parent = meter_box,
+                .layout {
+                    .size = {k_peak_meter_standard_width, layout::k_fill_parent},
+                },
+                .value_popup = FunctionRef<String()> {[&]() -> String {
+                    return PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options)
+                        .value_popup;
+                }},
+                .tooltip = FunctionRef<String()> {[&]() -> String {
+                    return fmt::Format(
+                        builder.arena,
+                        "Peak level of the audio leaving Floe, measured after the Master Volume. Each bar is one stereo channel. The meter flashes red if the signal clips above 0 dB.\n\n{}",
+                        PeakMeterTooltipText(builder.arena, g.engine.processor.peak_meter, options).tooltip);
+                }},
+            });
         if (auto const viewport_r = BoxRect(builder, peak_meter_box))
             DrawPeakMeter(g.imgui,
                           builder.imgui.RegisterAndConvertRect(*viewport_r),
@@ -768,22 +771,25 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
             .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
         };
 
-        auto const container =
-            DoBox(builder,
-                  {
-                      .parent = meter_box,
-                      .layout {
-                          .size = {layout::k_hug_contents, layout::k_fill_parent},
-                          .contents_gap = 4,
-                          .contents_direction = layout::Direction::Row,
-                      },
-                      .value_popup = FunctionRef<String()> {[&]() -> String {
-                          return LoudnessMeterTooltipText(builder.arena, loudness_options).value_popup;
-                      }},
-                      .tooltip = FunctionRef<String()> {[&]() -> String {
-                          return LoudnessMeterTooltipText(builder.arena, loudness_options).tooltip;
-                      }},
-                  });
+        auto const container = DoBox(
+            builder,
+            {
+                .parent = meter_box,
+                .layout {
+                    .size = {layout::k_hug_contents, layout::k_fill_parent},
+                    .contents_gap = 4,
+                    .contents_direction = layout::Direction::Row,
+                },
+                .value_popup = FunctionRef<String()> {[&]() -> String {
+                    return LoudnessMeterTooltipText(builder.arena, loudness_options).value_popup;
+                }},
+                .tooltip = FunctionRef<String()> {[&]() -> String {
+                    return fmt::Format(
+                        builder.arena,
+                        "Perceived loudness of the audio leaving Floe, measured in LUFS after the Master Volume. This reflects how loud the sound actually feels rather than its highest sample values.\n\nThe coloured bar shows short-term loudness (S, the last 3 seconds) and the white marker line shows momentary loudness (M, the last 400 ms).\n\nThe green region is a rough guide of a sensible level for Floe to be sending into your mix.\n\n{}",
+                        LoudnessMeterTooltipText(builder.arena, loudness_options).tooltip);
+                }},
+            });
 
         if (auto const viewport_r = BoxRect(builder,
                                             DoBox(builder,

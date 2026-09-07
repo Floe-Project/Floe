@@ -919,19 +919,15 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
         auto const size =
             TooltipBoxSize(fonts, FontType::BodyItalic, args.tooltip, max_text_width, text_margin);
 
-        // Stacked against the value popup on the side away from the element, so the value popup never
-        // moves when the tooltip appears.
+        // Stacked against the element and value popup as one block, so the value popup never moves when
+        // the tooltip appears and the tooltip never covers the element.
         auto const tooltip_r = ({
             Rect r;
             if (value_popup_r) {
                 auto const& v = *value_popup_r;
-                auto const gap = WwToPixels(k_small_gap);
-
-                auto const above_y = v.y - gap - size.y;
-                auto const below_y = v.Bottom() + gap;
-                auto place_above = v.Bottom() <= avoid_r.y;
-                if (place_above && above_y < 0) place_above = false;
-                if (!place_above && below_y + size.y > window_size.y && above_y >= 0) place_above = true;
+                auto const block_r =
+                    Rect::FromMinMax(Min(v.Min(), avoid_r.Min()), Max(v.Max(), avoid_r.Max()))
+                        .Expanded(WwToPixels(k_small_gap));
 
                 auto x = v.x + (v.w / 2) - (size.x / 2);
                 if (v.x >= avoid_r.Right())
@@ -939,11 +935,14 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
                 else if (v.Right() <= avoid_r.x)
                     x = v.Right() - size.x;
 
-                r = {
-                    .pos = {Clamp(x, 0.0f, Max(0.0f, window_size.x - size.x)),
-                            place_above ? above_y : below_y},
-                    .size = size,
-                };
+                r = {.pos = {x, block_r.Bottom()}, .size = size};
+                auto const pos =
+                    imgui::BestPopupPos(r, block_r, window_size, imgui::PopupJustification::AboveOrBelow);
+                if (pos.x >= 0)
+                    r.pos = pos;
+                else
+                    r.pos = {Clamp(x, 0.0f, Max(0.0f, window_size.x - size.x)),
+                             Clamp(block_r.Bottom(), 0.0f, Max(0.0f, window_size.y - size.y))};
             } else {
                 r = place_nearest_element(size);
             }

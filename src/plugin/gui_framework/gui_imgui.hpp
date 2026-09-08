@@ -650,7 +650,7 @@ struct Context {
     // Opacities that tooltips for the given ID should be drawn with; 0 means don't draw one. Probably use
     // overlay draw-list for drawing tooltips.
     struct TooltipOpacities {
-        f32 immediate; // Quickly fades in while the element is hot or active.
+        f32 immediate; // Quickly fades in once hot for a brief settle time, or instantly when active.
         f32 delayed; // Fades in after the mouse has rested on the element for a moment. 0 while active.
     };
     TooltipOpacities TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id);

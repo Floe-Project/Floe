@@ -2562,15 +2562,19 @@ Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, 
     RegisterRectForMouseTracking(rect_in_window_coords);
 
     constexpr auto k_delay_secs = 0.5;
+    constexpr auto k_settle_secs = 0.08; // Stops rapid flicker when sweeping the cursor across many items.
     constexpr auto k_fade_secs = 0.1;
 
-    if (WasJustMadeHot(id))
+    if (WasJustMadeHot(id)) {
+        GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_settle_secs);
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_delay_secs);
+    }
 
     TooltipOpacities result {};
 
     // WasJustDeactivated bridges the frame between releasing a drag and becoming hot again.
-    if (IsHot(id) || IsActive(id) || WasJustDeactivated(id)) {
+    auto const settled_hot = IsHot(id) && SecondsSpentHot() >= k_settle_secs;
+    if (settled_hot || IsActive(id) || WasJustDeactivated(id)) {
         if (immediate_tooltip_item != id) {
             immediate_tooltip_item = id;
             time_immediate_tooltip_started = GuiIo().in.current_time;

@@ -3294,7 +3294,10 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Pan"_s,
             .gui_label = "Pan"_s,
-            .tooltip = "Left/right balance"_s,
+            .tooltip =
+                "Pan: place this layer in the stereo field, anywhere from fully left to fully right.\n\n"
+                "It uses a constant-power pan law (-3 dB at centre), so the layer stays at the same perceived loudness wherever you put it.\n\n"
+                "Pan is applied after the Stereo control, so you can narrow a wide sound first and then place it as a single point."_s,
         };
         lp(StereoWidth) = Args {
             .id = id(region, 95), // never change
@@ -3307,7 +3310,9 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Stereo Width"_s,
             .gui_label = "Stereo"_s,
-            .tooltip = "Layer stereo width: negative narrows toward mono, positive widens"_s,
+            .tooltip =
+                "Stereo: narrow or widen this layer's stereo image. Negative values pull it toward mono, positive values push it wider, and 0% leaves the sound as recorded.\n\n"
+                "It works by splitting the sound into mid (what both channels share) and side (what differs between them), then rebalancing the two with a constant-power crossfade. At -100% only the mid remains; at +100% only the side, so anything dead centre disappears. Mono sounds have no side, so pushing to +100% silences them."_s,
         };
         lp(TuneCents) = Args {
             .id = id(region, 4), // never change
@@ -3322,7 +3327,8 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Detune Cents"_s,
             .gui_label = "Detune"_s,
-            .tooltip = "Layer pitch in cents; hold shift for finer adjustment"_s,
+            .tooltip =
+                "Detune: fine-tune this layer's pitch in cents (100 cents is one semitone). This works by speeding up or slowing down the audio."_s,
         };
         lp(TuneSemitone) = Args {
             .id = id(region, 5), // never change
@@ -3331,7 +3337,9 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Pitch Semitones"_s,
             .gui_label = "Pitch"_s,
-            .tooltip = "Layer pitch in semitones"_s,
+            .tooltip =
+                "Pitch: shift this layer's pitch in semitones. This works by speeding up or slowing down the audio.\n\n"
+                "Tip: for a multisampled Instrument, you might get better results from Transpose on the CONFIG tab. It changes which samples are played rather than processing them, which can sound more natural."_s,
         };
 
         // =================================================================================================

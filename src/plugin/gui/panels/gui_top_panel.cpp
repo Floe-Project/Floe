@@ -383,20 +383,20 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                         layer.VolumeEnvelopeIsOn(g.engine.processor.main_params));
             }
 
-            auto const auto_headline = WriteAutoDescription(
-                builder.arena,
-                snapshot.state,
-                layer_info,
-                {.form = AutoDescriptionForm::Headline, .random_seed = seed, .folder_name = folder});
-            auto const auto_full_block =
-                WriteAutoDescription(builder.arena,
-                                     snapshot.state,
-                                     layer_info,
-                                     {.form = AutoDescriptionForm::FullBlock, .random_seed = seed});
+            auto const write_auto = [&](AutoDescriptionForm form) {
+                return WriteAutoDescription(builder.arena,
+                                            snapshot.state,
+                                            layer_info,
+                                            {.form = form, .random_seed = seed, .folder_name = folder});
+            };
+            AutoDescriptionTexts const auto_texts {
+                .headline = write_auto(AutoDescriptionForm::Headline),
+                .full_block = write_auto(AutoDescriptionForm::FullBlock),
+                .detail = write_auto(AutoDescriptionForm::Detail),
+            };
             auto const* italic_font = builder.fonts.atlas[ToInt(FontType::BodyItalic)];
             auto const display = SplitPresetDescriptionForDisplay(snapshot.state.metadata.description,
-                                                                  auto_headline,
-                                                                  auto_full_block,
+                                                                  auto_texts,
                                                                   *italic_font,
                                                                   g.top_panel_description_width);
             g.preset_description_display = display;

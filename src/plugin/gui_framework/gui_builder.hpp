@@ -125,6 +125,7 @@ struct DrawTooltipArgs {
     String value_popup {};
     f32 value_popup_opacity = 0;
     String tooltip {};
+    String tooltip_footer {}; // Drawn dimmer beneath the tooltip text, inside the same box.
     f32 tooltip_opacity = 0;
 };
 using DrawOverlayTooltipForRectFunc = void(imgui::Context const& imgui,
@@ -282,6 +283,8 @@ struct BoxConfig {
     // Help text. Shown in italics after the mouse rests on the element, only if the show-tooltips
     // preference is on. Placed beside the value popup when both are present.
     TooltipString tooltip = k_nullopt;
+    // Interaction hints (e.g. "double-click to type"). Shown dimmer beneath the tooltip text.
+    String tooltip_footer {};
     // Placement options below apply to both boxes.
     imgui::Id tooltip_avoid_viewport_id = 0; // 0 = avoid nothing.
     Box const* tooltip_avoid_box = nullptr; // Tooltip is placed outside the visible part of this box.
@@ -306,6 +309,7 @@ Optional<Rect> BoxRect(GuiBuilder& builder, Box const& box);
 struct TooltipArgs {
     TooltipString value_popup = k_nullopt;
     TooltipString tooltip = k_nullopt;
+    String tooltip_footer {};
     Optional<Rect> avoid_r {}; // Window coords. If nullopt, uses the element's rect.
     TooltipPlacement placement = TooltipPlacement::BelowThenAbove;
 };

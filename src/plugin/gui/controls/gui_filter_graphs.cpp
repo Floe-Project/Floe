@@ -115,7 +115,8 @@ static void DrawGrabberHandleAndPopup(GuiState& g, GrabberDrawOptions const& opt
                      opt.popup_params,
                      opt.interaction_id,
                      opt.grabber_window_r,
-                     g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r));
+                     g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r),
+                     "Double-click to type. Right-click for more options."_s);
     filter_graph_draw::DrawHandle(g.imgui,
                                   g.imgui.ViewportPosToWindowPos(opt.node_pos_viewport),
                                   opt.handle_radius,

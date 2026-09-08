@@ -357,9 +357,6 @@ String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena,
     DynamicArray<char> buf {arena};
     if (greyed_out) fmt::Append(buf, "Not active. ");
     fmt::Append(buf, "{}", param.info.tooltip);
-    if (param.info.value_type == ParamValueType::Int)
-        fmt::Append(buf, ". Drag to edit or double-click to type a value");
-
     return buf.ToOwnedSpan();
 }
 
@@ -566,6 +563,7 @@ Box DoMenuParameter(GuiState& g,
                 if (options.override_tooltip.size) return options.override_tooltip;
                 return ParamTooltipText(param, g.builder.arena);
             }},
+            .tooltip_footer = ParamClickableTooltipFooter(param),
             .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
             .button_behaviour = imgui::ButtonConfig {},
         });
@@ -761,6 +759,7 @@ Box DoKnobParameter(GuiState& g,
                                         g.builder.arena,
                                         options.greyed_out && !inactive_reason_in_popup);
             }},
+            .tooltip_footer = k_dragger_tooltip_footer,
         });
 
     auto val = param.LinearValue();
@@ -954,10 +953,13 @@ Box DoVerticalSliderParameter(GuiState& g,
                       if (options.override_tooltip.size) return options.override_tooltip;
                       return ParamTooltipText(param, g.builder.arena);
                   }},
+                  .tooltip_footer = k_dragger_tooltip_footer,
               });
 
     auto val = param.LinearValue();
+    auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});
     Optional<f32> new_val {};
+    Optional<imgui::TextInputResult> param_text_input_result {};
 
     // Dragger behaviour.
     if (auto const viewport_r = BoxRect(g.builder, container)) {
@@ -967,11 +969,21 @@ Box DoVerticalSliderParameter(GuiState& g,
             auto const dragger_result = g.builder.imgui.DraggerBehaviour({
                 .rect_in_window_coords = window_r,
                 .id = container.imgui_id,
-                .text = ""_s,
+                .text = (String)display_string,
                 .min = param.info.linear_range.min,
                 .max = param.info.linear_range.max,
                 .value = val,
                 .default_value = param.info.default_linear_value,
+                .text_input_button_cfg {
+                    .mouse_button = MouseButton::Left,
+                    .event = MouseButtonEvent::DoubleClick,
+                },
+                .text_input_cfg {
+                    .x_padding = WwToPixels(4.0f),
+                    .centre_align = true,
+                    .escape_unfocuses = true,
+                    .select_all_when_opening = true,
+                },
                 .slider_cfg {
                     .sensitivity = 256 / param.info.linear_range.Delta(),
                     .slower_with_shift = true,
@@ -982,7 +994,14 @@ Box DoVerticalSliderParameter(GuiState& g,
             container.is_active = g.imgui.IsActive(container.imgui_id, MouseButton::Left);
             container.is_hot = g.imgui.IsHot(container.imgui_id);
 
+            if (dragger_result.new_string_value) {
+                if (auto v = param.info.StringToLinearValue(*dragger_result.new_string_value)) {
+                    new_val = v;
+                    GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::ImmediatelyUpdate);
+                }
+            }
             if (dragger_result.value_changed) new_val = val;
+            param_text_input_result = dragger_result.text_input_result;
 
             if (g.imgui.WasJustActivated(container.imgui_id, MouseButton::Left))
                 ParameterJustStartedMoving(g.engine.processor, param.info.index);
@@ -997,6 +1016,15 @@ Box DoVerticalSliderParameter(GuiState& g,
         }
 
         DoLegacyOverrideOverlay(g, window_r, param.info.index);
+    }
+
+    // Focus the text input if requested.
+    if (g.builder.IsInputAndRenderPass()) {
+        if (g.param_text_editor_to_open && *g.param_text_editor_to_open == param.info.index) {
+            g.param_text_editor_to_open.Clear();
+            g.imgui.SetTextInputFocus(container.imgui_id, display_string, false);
+            g.imgui.TextInputSelectAll();
+        }
     }
 
     // Drawing.
@@ -1023,6 +1051,15 @@ Box DoVerticalSliderParameter(GuiState& g,
                                .greyed_out = options.greyed_out,
                                .is_fake = options.is_fake,
                            });
+    }
+
+    // Draw text input after the slider so its on top.
+    if (param_text_input_result) {
+        if (auto const rel_r = BoxRect(g.builder, container)) {
+            auto const r = g.builder.imgui.ViewportRectToWindowRect(*rel_r);
+
+            DrawParameterTextInput(g.builder.imgui, r, *param_text_input_result);
+        }
     }
 
     return container;
@@ -1055,6 +1092,7 @@ Box DoButtonParameter(GuiState& g,
                                          if (options.override_tooltip.size) return options.override_tooltip;
                                          return ParamTooltipText(param, g.builder.arena);
                                      }},
+                                     .tooltip_footer = ParamClickableTooltipFooter(param),
                                      .button_behaviour = imgui::ButtonConfig {},
                                  });
 
@@ -1138,6 +1176,7 @@ DoMuteSoloButton(GuiState& g, Box parent, DescribedParamValue const& param, bool
             },
             .tooltip =
                 FunctionRef<String()> {[&]() -> String { return ParamTooltipText(param, g.builder.arena); }},
+            .tooltip_footer = ParamClickableTooltipFooter(param),
             .button_behaviour = imgui::ButtonConfig {},
         });
 
@@ -1241,6 +1280,7 @@ Box DoIntParameter(GuiState& g,
                       if (options.override_tooltip.size) return options.override_tooltip;
                       return ParamTooltipText(param, g.builder.arena);
                   }},
+                  .tooltip_footer = k_dragger_tooltip_footer,
                   .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
               });
 
@@ -1390,6 +1430,7 @@ Box DoPercentDraggerParameter(GuiState& g,
             },
             .tooltip =
                 FunctionRef<String()> {[&]() -> String { return ParamTooltipText(param, g.builder.arena); }},
+            .tooltip_footer = k_dragger_tooltip_footer,
             .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
         });
 
@@ -1532,16 +1573,18 @@ void ParameterTooltip(GuiState& g,
                       DescribedParamValue const& param,
                       imgui::Id imgui_id,
                       Rect window_r,
-                      Optional<Rect> avoid_r) {
+                      Optional<Rect> avoid_r,
+                      String tooltip_footer) {
     auto param_ptr = &param;
-    ParameterTooltip(g, {&param_ptr, 1}, imgui_id, window_r, avoid_r);
+    ParameterTooltip(g, {&param_ptr, 1}, imgui_id, window_r, avoid_r, tooltip_footer);
 }
 
 void ParameterTooltip(GuiState& g,
                       Span<DescribedParamValue const*> params,
                       imgui::Id imgui_id,
                       Rect window_r,
-                      Optional<Rect> avoid_r) {
+                      Optional<Rect> avoid_r,
+                      String tooltip_footer) {
     Tooltip(g,
             imgui_id,
             window_r,
@@ -1561,6 +1604,7 @@ void ParameterTooltip(GuiState& g,
                     }
                     return buf.ToOwnedSpan();
                 }},
+                .tooltip_footer = tooltip_footer,
                 .avoid_r = avoid_r,
             });
 }

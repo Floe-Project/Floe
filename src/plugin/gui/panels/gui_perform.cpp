@@ -553,23 +553,29 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
             {
                 .icon = MidPanelIcon::Shuffle,
                 .tooltip =
-                    "Click to load a new random variation using the same randomness as last time.\n\n"
-                    "Or, click anywhere on the strip to load a variation: further right means a more varied result, further left stays closer to the current preset."_s,
+                    any_active
+                        ? "Load another Random Variation of the loaded preset, using the same amount of variation as last time. Handy for rolling through a few takes at an intensity you like, without having to click the strip in exactly the same spot again.\n\nHover to see the amount it'll use."_s
+                        : "Load a random sound. Nothing is loaded at the moment, so Floe will pick an Instrument at random and build a sound around it."_s,
                 .greyed_out = !any_active,
             });
 
-        auto const strip = DoBox(builder,
-                                 {
-                                     .parent = pill,
-                                     .id_extra = 1,
-                                     .background_fill_colours = Col {.c = Col::White, .alpha = 12},
-                                     .round_background_corners = 0b1111,
-                                     .corner_rounding = k_corner_rounding,
-                                     .layout {
-                                         .size = {layout::k_fill_parent, layout::k_fill_parent},
-                                     },
-                                     .button_behaviour = imgui::ButtonConfig {},
-                                 });
+        auto const strip = DoBox(
+            builder,
+            {
+                .parent = pill,
+                .id_extra = 1,
+                .background_fill_colours = Col {.c = Col::White, .alpha = 12},
+                .round_background_corners = 0b1111,
+                .corner_rounding = k_corner_rounding,
+                .layout {
+                    .size = {layout::k_fill_parent, layout::k_fill_parent},
+                },
+                .tooltip =
+                    any_active
+                        ? "Click anywhere on this strip to load a Random Variation: a fresh take on the loaded preset, built from its Instruments, effects and macros.\n\nWhere you click sets how far it strays from that preset. Towards the left keeps things close with small, related tweaks. Towards the right gets wilder: Instruments swapped, layers added, effects toggled and bigger parameter moves.\n\nEvery variation starts from the preset as it was loaded, not from the previous variation, so you can roll as many as you like without drifting ever further away. Each one is a single undo step, and the undo button in the top bar steps back through them. If you want to create a new basis on which to explore variations, you'll need to save the current state as a preset."_s
+                        : "Click anywhere on this strip to load a random sound. Nothing is loaded at the moment, so Floe will pick an Instrument at random and build a sound around it."_s,
+                .button_behaviour = imgui::ButtonConfig {},
+            });
 
         String hover_label = {};
 
@@ -796,34 +802,61 @@ static void DoDescriptionColumn(GuiBuilder& builder, GuiState& g, Box parent) {
     constexpr f32 k_desc_column_width = 160;
 
     auto const& display = g.preset_description_display;
+    bool const has_user_description = g.engine.pinned_snapshot.state.metadata.description.size != 0;
 
-    auto const column = DoBox(builder,
-                              {
-                                  .parent = parent,
-                                  .border_colours = Col {.c = Col::White, .alpha = 20},
-                                  .border_edges = 0b1000, // left
-                                  .layout {
-                                      .size = {k_desc_column_width, layout::k_fill_parent},
-                                      .contents_padding = {.lr = 10, .tb = 10},
-                                      .contents_gap = 6,
-                                      .contents_direction = layout::Direction::Column,
-                                      .contents_align = layout::Alignment::Start,
-                                      .contents_cross_axis_align = layout::CrossAxisAlign::Start,
-                                  },
-                              });
+#define WRITE_DESCRIPTION_TOOLTIP_NOTE                                                                       \
+    "When saving a preset, you can write a description of your own. Everything before the first line "       \
+    "break goes next to the preset name at the top of Floe, and the rest appears here."
+
+    auto const column = DoBox(
+        builder,
+        {
+            .parent = parent,
+            .border_colours = Col {.c = Col::White, .alpha = 20},
+            .border_edges = 0b1000, // left
+            .layout {
+                .size = {k_desc_column_width, layout::k_fill_parent},
+                .contents_padding = {.lr = 10, .tb = 10},
+                .contents_gap = 6,
+                .contents_direction = layout::Direction::Column,
+                .contents_align = layout::Alignment::Start,
+                .contents_cross_axis_align = layout::CrossAxisAlign::Start,
+            },
+            .tooltip = [&]() -> String {
+                switch (display.kind) {
+                    case LongDescriptionKind::User:
+                    case LongDescriptionKind::UserContinued:
+                        return "The rest of this preset's description, written by whoever made it. The first part is shown next to the preset name at the top of Floe.\n\n" WRITE_DESCRIPTION_TOOLTIP_NOTE
+                               ""_s;
+                    case LongDescriptionKind::Auto:
+                        if (has_user_description)
+                            return "An automatic summary of what's in this preset: its Instruments, how they loop, the character of the sound and so on. The preset's own description is short enough to fit next to the preset name at the top of Floe, so Floe fills this space with a summary instead.\n\n" WRITE_DESCRIPTION_TOOLTIP_NOTE
+                                   ""_s;
+                        if (display.bottom_text.size)
+                            return "This preset has no description of its own, so Floe has written one automatically from what's in it: its Instruments, how they loop, the character of the sound and so on. The opening line is next to the preset name at the top of Floe, and the rest is here.\n\n" WRITE_DESCRIPTION_TOOLTIP_NOTE
+                                   ""_s;
+                        return "This preset has no description of its own, so Floe has written a short one automatically next to the preset name at the top of Floe. It's a simple enough preset that there's nothing more to add here.\n\n" WRITE_DESCRIPTION_TOOLTIP_NOTE
+                               ""_s;
+                }
+                return ""_s;
+            }(),
+        });
+
+#undef WRITE_DESCRIPTION_TOOLTIP_NOTE
+
+    bool const empty = !display.bottom_text.size;
 
     DoSectionLabel(builder, column, [&]() {
         switch (display.kind) {
             case LongDescriptionKind::UserContinued: return "DESCRIPTION (CONTINUED)"_s;
             case LongDescriptionKind::User: return "DESCRIPTION"_s;
-            case LongDescriptionKind::Auto: return "AUTO DESCRIPTION"_s;
+            case LongDescriptionKind::Auto: return empty ? "DESCRIPTION"_s : "DESCRIPTION (AUTO)"_s;
         }
         return ""_s;
     }());
 
-    if (!display.bottom_text.size) return;
-
-    auto const bottom_text = display.kind == LongDescriptionKind::UserContinued
+    auto const bottom_text = empty ? "–"_s
+                             : display.kind == LongDescriptionKind::UserContinued
                                  ? (String)fmt::Format(g.scratch_arena, "…{}", display.bottom_text)
                                  : display.bottom_text;
 
@@ -834,7 +867,7 @@ static void DoDescriptionColumn(GuiBuilder& builder, GuiState& g, Box parent) {
               .wrap_width = k_wrap_to_parent,
               .size_from_text = true,
               .font = FontType::BodyItalic,
-              .text_colours = Col {.c = Col::White, .alpha = 170},
+              .text_colours = Col {.c = Col::White, .alpha = (u8)(empty ? 90 : 170)},
           });
 }
 

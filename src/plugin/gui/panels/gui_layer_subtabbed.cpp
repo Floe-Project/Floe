@@ -333,28 +333,10 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
                 .contents_align = layout::Alignment::Start,
                 .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
             },
-            .tooltip = FunctionRef<String()> {[&]() -> String {
-                switch (layer_obj.instrument.tag) {
-                    case InstrumentType::None: return "Select the instrument for this layer"_s;
-                    case InstrumentType::WaveformSynth:
-                        return fmt::Format(
-                            g.scratch_arena,
-                            "Current instrument: {}\nChange or remove the instrument for this layer",
-                            inst_name);
-                    case InstrumentType::Sampler: {
-                        auto const& sample = layer_obj.instrument.GetFromTag<InstrumentType::Sampler>();
-                        return fmt::Format(
-                            g.scratch_arena,
-                            "Change or remove the instrument for this layer\n\nCurrent instrument: {} from {} by {}.{}{}",
-                            inst_name,
-                            sample->instrument.library.name,
-                            sample->instrument.library.author,
-                            sample->instrument.description ? "\n\n" : "",
-                            sample->instrument.description ? sample->instrument.description : "");
-                    }
-                }
-                return {};
-            }},
+            .tooltip =
+                layer_obj.instrument.tag != InstrumentType::None
+                    ? "Open the Instrument Browser to choose a different Instrument for this layer. The Instrument is the sound source that this layer plays.\n\nRight-click for more options, including copying and pasting Instruments and whole layers."_s
+                    : "Open the Instrument Browser to choose an Instrument for this layer. The Instrument is the sound source that this layer plays.\n\nThis layer is silent until it has an Instrument."_s,
             .button_behaviour = imgui::ButtonConfig {},
             .name = layer_index == 0 ? "layer-top.inst-selector"_s : String {},
         });
@@ -468,13 +450,17 @@ static void DoInstSelector(GuiState& g, GuiFrameContext const& frame_context, u8
 
     // Unload button
     auto const has_instrument = layer_obj.instrument_id.tag != InstrumentType::None;
-    auto const unload_btn = DoMidPanelIconButton(g.builder,
-                                                 nav_box,
-                                                 {
-                                                     .icon = MidPanelIcon::Unload,
-                                                     .tooltip = "Unload the current instrument."_s,
-                                                     .greyed_out = !has_instrument,
-                                                 });
+    auto const unload_btn = DoMidPanelIconButton(
+        g.builder,
+        nav_box,
+        {
+            .icon = MidPanelIcon::Unload,
+            .tooltip =
+                has_instrument
+                    ? "Clear the Instrument from this layer. The layer becomes empty: with no sound source, it won't make any sound."_s
+                    : "Clear the Instrument from this layer. There's nothing to clear right now, as this layer is already empty."_s,
+            .greyed_out = !has_instrument,
+        });
     if (unload_btn.button_fired && has_instrument)
         LoadInstrument(g.engine, layer_index, InstrumentType::None);
 }
@@ -617,25 +603,27 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
             .max_db = 12,
             .show_warning_zones = false,
         };
-        auto const meter_box = DoBox(g.builder,
-                                     {
-                                         .parent = vol_col,
-                                         .layout {
-                                             .size = {k_peak_meter_standard_width, k_vol_slider_height},
-                                         },
-                                         .value_popup = FunctionRef<String()> {[&]() -> String {
-                                             return PeakMeterTooltipText(g.builder.arena,
-                                                                         layer_processor.peak_meter,
-                                                                         peak_meter_options)
-                                                 .value_popup;
-                                         }},
-                                         .tooltip = FunctionRef<String()> {[&]() -> String {
-                                             return PeakMeterTooltipText(g.builder.arena,
-                                                                         layer_processor.peak_meter,
-                                                                         peak_meter_options)
-                                                 .tooltip;
-                                         }},
-                                     });
+        auto const meter_box = DoBox(
+            g.builder,
+            {
+                .parent = vol_col,
+                .layout {
+                    .size = {k_peak_meter_standard_width, k_vol_slider_height},
+                },
+                .value_popup = FunctionRef<String()> {[&]() -> String {
+                    return PeakMeterTooltipText(g.builder.arena,
+                                                layer_processor.peak_meter,
+                                                peak_meter_options)
+                        .value_popup;
+                }},
+                .tooltip = FunctionRef<String()> {[&]() -> String {
+                    return fmt::Format(
+                        g.builder.arena,
+                        "Level of this layer's output.\n\n{}",
+                        PeakMeterTooltipText(g.builder.arena, layer_processor.peak_meter, peak_meter_options)
+                            .tooltip);
+                }},
+            });
         if (auto const r = BoxRect(g.builder, meter_box))
             DrawPeakMeter(g.imgui,
                           g.imgui.ViewportRectToWindowRect(*r),
@@ -1422,6 +1410,7 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                                    .tooltip = FunctionRef<String()> {[&]() -> String {
                                        return ParamTooltipText(param, g.builder.arena);
                                    }},
+                                   .tooltip_footer = ParamClickableTooltipFooter(param),
                                    .button_behaviour = imgui::ButtonConfig {},
                                });
 
@@ -2713,6 +2702,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                                        .tooltip = FunctionRef<String()> {[&]() -> String {
                                            return ParamTooltipText(param, g.builder.arena);
                                        }},
+                                       .tooltip_footer = ParamClickableTooltipFooter(param),
                                        .tooltip_avoid_box = &cell,
                                        .button_behaviour = imgui::ButtonConfig {},
                                    });

@@ -845,17 +845,29 @@ void DrawOverlayViewportBackground(imgui::Context const& imgui) {
     imgui.draw_list->AddRectFilled(r, ToU32({.c = Col::Background0}), rounding);
 }
 
-static f32x2 TooltipBoxSize(Fonts& fonts, FontType font, String str, f32 max_text_width, f32x2 text_margin) {
+struct TooltipText {
+    String text;
+    String footer {}; // Dimmer, as a separate paragraph beneath the text.
+};
+
+static f32 TooltipFooterGap(Fonts& fonts) { return fonts.Current()->font_size; }
+
+static f32x2
+TooltipBoxSize(Fonts& fonts, FontType font, TooltipText const& str, f32 max_text_width, f32x2 text_margin) {
     fonts.Push(ToInt(font));
     DEFER { fonts.Pop(); };
-    auto const wrapped_size = fonts.CalcTextSize(str, {.wrap_width = max_text_width});
-    return f32x2 {Min(max_text_width, wrapped_size.x), wrapped_size.y} + (text_margin * 2);
+    auto size = fonts.CalcTextSize(str.text, {.wrap_width = max_text_width});
+    if (str.footer.size) {
+        auto const footer_size = fonts.CalcTextSize(str.footer, {.wrap_width = max_text_width});
+        size = {Max(size.x, footer_size.x), size.y + TooltipFooterGap(fonts) + footer_size.y};
+    }
+    return f32x2 {Min(max_text_width, size.x), size.y} + (text_margin * 2);
 }
 
 static void DrawTooltipBox(imgui::Context const& imgui,
                            Fonts& fonts,
                            FontType font,
-                           String str,
+                           TooltipText const& str,
                            Rect r,
                            f32x2 text_margin,
                            f32 opacity) {
@@ -866,10 +878,19 @@ static void DrawTooltipBox(imgui::Context const& imgui,
     imgui.overlay_draw_list->AddRectFilled(r,
                                            ChangeAlpha(ToU32(Col {.c = Col::Background0}), opacity),
                                            WwToPixels(k_corner_rounding));
+    auto const wrap_width = r.w - (text_margin.x * 2) + 1;
     imgui.overlay_draw_list->AddText(r.pos + text_margin,
                                      ChangeAlpha(ToU32(Col {.c = Col::Text}), opacity),
-                                     str,
-                                     {.wrap_width = r.w - (text_margin.x * 2) + 1});
+                                     str.text,
+                                     {.wrap_width = wrap_width});
+    if (str.footer.size) {
+        auto const text_height = fonts.CalcTextSize(str.text, {.wrap_width = wrap_width}).y;
+        imgui.overlay_draw_list->AddText(r.pos + text_margin +
+                                             f32x2 {0, text_height + TooltipFooterGap(fonts)},
+                                         ChangeAlpha(ToU32(Col {.c = Col::Subtext0}), opacity),
+                                         str.footer,
+                                         {.wrap_width = wrap_width});
+    }
 }
 
 enum class TooltipSide : u8 { Below, Above, Right, Left };
@@ -911,7 +932,7 @@ static f32 TooltipTextWidthOnSide(TooltipPlacementContext const& ctx, TooltipSid
 static Rect PlaceTooltipBesideElement(TooltipPlacementContext const& ctx,
                                       Fonts& fonts,
                                       FontType font,
-                                      String str,
+                                      TooltipText const& str,
                                       TooltipPlacement placement) {
     auto const min_text_width = WwToPixels(k_tooltip_min_width);
     auto const clamp_x = [&](Rect r) {
@@ -966,12 +987,12 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
 
     Optional<Rect> value_popup_r {};
     if (args.value_popup_opacity > 0) {
-        value_popup_r =
-            PlaceTooltipBesideElement(ctx, fonts, FontType::Body, args.value_popup, args.placement);
+        TooltipText const value_popup {.text = args.value_popup};
+        value_popup_r = PlaceTooltipBesideElement(ctx, fonts, FontType::Body, value_popup, args.placement);
         DrawTooltipBox(imgui,
                        fonts,
                        FontType::Body,
-                       args.value_popup,
+                       value_popup,
                        *value_popup_r,
                        text_margin,
                        args.value_popup_opacity);
@@ -980,19 +1001,19 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
     if (args.tooltip_opacity > 0) {
         auto const font = FontType::BodyItalic;
         auto const gap = WwToPixels(k_small_gap);
+        TooltipText const tooltip {.text = args.tooltip, .footer = args.tooltip_footer};
 
         // Stacked against the element and value popup, so the value popup never moves when the tooltip
         // appears and the tooltip never covers the element.
         auto const tooltip_r = ({
             Rect r;
             if (!value_popup_r) {
-                r = PlaceTooltipBesideElement(ctx, fonts, font, args.tooltip, args.placement);
+                r = PlaceTooltipBesideElement(ctx, fonts, font, tooltip, args.placement);
             } else if (auto const& v = *value_popup_r; v.x >= avoid_r.Right() || v.Right() <= avoid_r.x) {
                 // Value popup sits in the gap beside the element: continue the stack downwards within
                 // that same gap, wrapped to the same width.
                 auto const side = v.x >= avoid_r.Right() ? TooltipSide::Right : TooltipSide::Left;
-                r.size =
-                    TooltipBoxSize(fonts, font, args.tooltip, TooltipTextWidthOnSide(ctx, side), text_margin);
+                r.size = TooltipBoxSize(fonts, font, tooltip, TooltipTextWidthOnSide(ctx, side), text_margin);
                 r.x = side == TooltipSide::Right ? v.x : v.Right() - r.w;
                 r.y = v.Bottom() + gap;
                 if (r.Bottom() > window_size.y) r.y = v.y - gap - r.h;
@@ -1002,7 +1023,7 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
                     Rect::FromMinMax(Min(v.Min(), avoid_r.Min()), Max(v.Max(), avoid_r.Max())).Expanded(gap);
                 r.size = TooltipBoxSize(fonts,
                                         font,
-                                        args.tooltip,
+                                        tooltip,
                                         TooltipTextWidthOnSide(ctx, TooltipSide::Below),
                                         text_margin);
                 auto const x = v.CentreX() - (r.w / 2);
@@ -1021,7 +1042,7 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
         DrawTooltipBox(imgui,
                        fonts,
                        FontType::BodyItalic,
-                       args.tooltip,
+                       tooltip,
                        tooltip_r,
                        text_margin,
                        args.tooltip_opacity);

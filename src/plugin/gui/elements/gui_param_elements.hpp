@@ -146,8 +146,19 @@ bool DoResetSectionMenuItems(GuiState& g,
                              String name,
                              bool no_icon_gap = true);
 
-// Help text: the parameter's description plus any editing hints.
+// Help text: the parameter's description.
 String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena, bool greyed_out = false);
+
+// Interaction hints shown dimmed beneath a parameter's tooltip. These belong to the widget rather than the
+// parameter, so the descriptor text shouldn't repeat them.
+constexpr String k_dragger_tooltip_footer =
+    "Shift-drag for fine control. " MODIFIER_KEY_NAME
+    "-click to reset. Double-click to type. Right-click for more options."_s;
+constexpr String k_right_click_tooltip_footer = "Right-click for more options."_s;
+// For buttons and menus, which only have a right-click menu when automatable.
+constexpr String ParamClickableTooltipFooter(DescribedParamValue const& param) {
+    return param.info.flags.not_automatable ? String {} : k_right_click_tooltip_footer;
+}
 
 // Value readout: just the value for a single parameter, "Label: value" lines for several.
 String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocator& arena);
@@ -169,9 +180,11 @@ void ParameterTooltip(GuiState& g,
                       DescribedParamValue const& param,
                       imgui::Id imgui_id,
                       Rect window_r,
-                      Optional<Rect> avoid_r = k_nullopt);
+                      Optional<Rect> avoid_r,
+                      String tooltip_footer);
 void ParameterTooltip(GuiState& g,
                       Span<DescribedParamValue const*> params,
                       imgui::Id imgui_id,
                       Rect window_r,
-                      Optional<Rect> avoid_r = k_nullopt);
+                      Optional<Rect> avoid_r,
+                      String tooltip_footer);

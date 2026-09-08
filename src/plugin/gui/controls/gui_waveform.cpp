@@ -63,10 +63,10 @@ static Optional<String> WaveformTooltipText(LayerProcessor const& layer,
                                             MultisampleDisplay multisample_display) {
 #define WAVEFORM_INTRO "The waveform display. "
 #define VOICE_MARKERS  "The red markers are voices, each one tracking through the sample as it plays."_s
-#define MULTISAMPLE_INTRO                                                                                     \
-    WAVEFORM_INTRO                                                                                            \
-        "This Instrument contains many samples, and the one you hear depends on which note you play and how " \
-        "hard. "
+#define MULTISAMPLE_INTRO                                                                                    \
+    WAVEFORM_INTRO                                                                                           \
+    "This Instrument contains many samples, and the one you hear depends on which note you play and how "    \
+    "hard. "
 
     switch (layer.instrument.tag) {
         case InstrumentType::None: return k_nullopt;
@@ -384,7 +384,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
             // the waveform you're editing.
             auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
             auto param_obj = g.engine.processor.main_params.DescribedValue(*tooltip_param);
-            ParameterTooltip(g, param_obj, id, grabber_r, avoid_r);
+            ParameterTooltip(g, param_obj, id, grabber_r, avoid_r, k_dragger_tooltip_footer);
         }
     };
 

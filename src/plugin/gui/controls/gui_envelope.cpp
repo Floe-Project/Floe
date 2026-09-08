@@ -310,7 +310,7 @@ void DoEnvelopeGui(GuiState& g,
         if (imgui.WasJustDeactivated(attack_imgui_id, MouseButton::Left))
             ParameterJustStoppedMoving(engine.processor, indices[k_attack_index]);
 
-        ParameterTooltip(g, attack_param, attack_imgui_id, grabber);
+        ParameterTooltip(g, attack_param, attack_imgui_id, grabber, k_nullopt, k_dragger_tooltip_footer);
 
         OverlayMacroDestinationRegion(g, grabber, indices[k_attack_index]);
     }
@@ -400,7 +400,7 @@ void DoEnvelopeGui(GuiState& g,
             ParameterJustStoppedMoving(engine.processor, indices[k_sustain_index]);
         }
 
-        ParameterTooltip(g, param_ptrs, dec_sus_imgui_id, grabber);
+        ParameterTooltip(g, param_ptrs, dec_sus_imgui_id, grabber, k_nullopt, k_dragger_tooltip_footer);
 
         {
             auto const h = grabber.h / 2;
@@ -466,7 +466,7 @@ void DoEnvelopeGui(GuiState& g,
         if (imgui.WasJustDeactivated(release_imgui_id, MouseButton::Left))
             ParameterJustStoppedMoving(engine.processor, indices[k_release_index]);
 
-        ParameterTooltip(g, release_param, release_imgui_id, grabber);
+        ParameterTooltip(g, release_param, release_imgui_id, grabber, k_nullopt, k_dragger_tooltip_footer);
 
         OverlayMacroDestinationRegion(g, grabber, indices[k_release_index]);
     }

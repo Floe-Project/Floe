@@ -536,7 +536,7 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
                                                       {
                                                           .r = window_r,
                                                           .avoid_r = window_r,
-                                                          .justification = TooltipJustification::AboveOrBelow,
+                                                          .placement = TooltipPlacement::BelowThenAbove,
                                                           .value_popup = text,
                                                           .value_popup_opacity = 1,
                                                       });

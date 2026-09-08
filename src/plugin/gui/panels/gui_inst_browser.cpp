@@ -348,6 +348,7 @@ static void InstBrowserItems(GuiBuilder& builder, InstBrowserContext& context, I
                 .parent = root,
                 .folder = folder,
                 .skip_heading = IsSingleFolderFilterSelected(common_state, folder->Hash()),
+                .tooltip_placement = TooltipPlacement::RightThenLeft,
             };
         }
 

@@ -441,7 +441,7 @@ DoBrowserItem(GuiBuilder& builder, CommonBrowserState& state, BrowserItemOptions
                   .value_popup = options.value_popup,
                   .tooltip = options.tooltip,
                   .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
-                  .tooltip_justification = TooltipJustification::LeftOrRight,
+                  .tooltip_placement = TooltipPlacement::RightThenLeft,
                   .button_behaviour = imgui::ButtonConfig {.dont_fire_on_double_click = true},
               });
 
@@ -744,7 +744,7 @@ Box DoFilterButton(GuiBuilder& builder,
                   .value_popup = options.common.value_popup,
                   .tooltip = options.common.tooltip,
                   .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
-                  .tooltip_justification = TooltipJustification::LeftOrRight,
+                  .tooltip_placement = TooltipPlacement::LeftThenRight,
                   .button_behaviour = imgui::ButtonConfig {},
                   .name = options.name,
               });
@@ -908,7 +908,7 @@ Box DoFilterTreeButton(GuiBuilder& builder,
                   .value_popup = options.common.value_popup,
                   .tooltip = options.common.tooltip,
                   .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
-                  .tooltip_justification = TooltipJustification::LeftOrRight,
+                  .tooltip_placement = TooltipPlacement::LeftThenRight,
                   .button_behaviour = imgui::ButtonConfig {},
               });
 
@@ -1385,7 +1385,7 @@ BrowserSection::Result BrowserSection::Do(GuiBuilder& builder) {
                       },
                       .tooltip = folder ? TooltipString {"Expand/collapse folder"_s} : k_nullopt,
                       .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->root_viewport->id,
-                      .tooltip_justification = TooltipJustification::LeftOrRight,
+                      .tooltip_placement = tooltip_placement,
                       .button_behaviour = imgui::ButtonConfig {},
                   });
 

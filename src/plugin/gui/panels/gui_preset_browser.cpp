@@ -470,6 +470,7 @@ void PresetBrowserItems(GuiBuilder& builder, PresetBrowserContext& context, Pres
                 .folder = &preset_folder->node,
                 .skip_root_folder = true,
                 .skip_heading = IsSingleFolderFilterSelected(state.common_state, folder_hash),
+                .tooltip_placement = TooltipPlacement::RightThenLeft,
                 .right_click_menu = PresetFolderRightClickMenu,
             };
         }

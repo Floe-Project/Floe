@@ -502,6 +502,7 @@ struct BrowserSection {
     bool skip_heading {};
     bool dark_mode {};
     bool keyboard_focusable {};
+    TooltipPlacement tooltip_placement {TooltipPlacement::LeftThenRight};
     RightClickMenuState::Function right_click_menu {};
     persistent_store::Store* store {};
 

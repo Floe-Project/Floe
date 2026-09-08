@@ -111,14 +111,17 @@ enum class GuiBuilderPass : u8 {
     HandleInputAndRender,
 };
 
-enum class TooltipJustification : u8 { AboveOrBelow, LeftOrRight };
+// Sides are tried in the order named. The first side is strongly preferred: text is wrapped narrower to fit
+// there, and only when even the minimum width doesn't fit is the next side tried. The other axis is tried
+// after the named pair.
+enum class TooltipPlacement : u8 { BelowThenAbove, AboveThenBelow, RightThenLeft, LeftThenRight };
 
 // Two boxes: the value popup (regular font, nearest the element) and the tooltip (italic, stacked beside
 // the value popup). Either is skipped when its opacity is 0.
 struct DrawTooltipArgs {
     Rect r; // The rect that opened the tooltip.
     Rect avoid_r; // The rect to avoid when placing the tooltip;
-    TooltipJustification justification;
+    TooltipPlacement placement;
     String value_popup {};
     f32 value_popup_opacity = 0;
     String tooltip {};
@@ -282,7 +285,7 @@ struct BoxConfig {
     // Placement options below apply to both boxes.
     imgui::Id tooltip_avoid_viewport_id = 0; // 0 = avoid nothing.
     Box const* tooltip_avoid_box = nullptr; // Tooltip is placed outside the visible part of this box.
-    TooltipJustification tooltip_justification = TooltipJustification::AboveOrBelow;
+    TooltipPlacement tooltip_placement = TooltipPlacement::BelowThenAbove;
 
     Optional<imgui::ButtonConfig> button_behaviour = k_nullopt;
     u8 extra_margin_for_mouse_events = 0;
@@ -304,6 +307,6 @@ struct TooltipArgs {
     TooltipString value_popup = k_nullopt;
     TooltipString tooltip = k_nullopt;
     Optional<Rect> avoid_r {}; // Window coords. If nullopt, uses the element's rect.
-    TooltipJustification justification = TooltipJustification::AboveOrBelow;
+    TooltipPlacement placement = TooltipPlacement::BelowThenAbove;
 };
 bool Tooltip(GuiBuilder& builder, imgui::Id id, Rect rect_in_window_coords, TooltipArgs const& args);

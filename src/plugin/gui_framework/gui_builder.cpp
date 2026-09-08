@@ -204,7 +204,7 @@ bool Tooltip(GuiBuilder& builder, imgui::Id id, Rect rect_in_window_coords, Tool
                                 {
                                     .r = rect_in_window_coords,
                                     .avoid_r = args.avoid_r.ValueOr(rect_in_window_coords),
-                                    .justification = args.justification,
+                                    .placement = args.placement,
                                     .value_popup = value_popup,
                                     .value_popup_opacity = value_popup.size ? value_popup_opacity : 0,
                                     .tooltip = tooltip,
@@ -561,7 +561,7 @@ NO_UBSAN Box DoBox(GuiBuilder& builder, BoxConfig const& config, u64 loc_hash) {
                             .value_popup = config.value_popup,
                             .tooltip = config.tooltip,
                             .avoid_r = avoid_r,
-                            .justification = config.tooltip_justification,
+                            .placement = config.tooltip_placement,
                         });
             }
 

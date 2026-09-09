@@ -905,6 +905,8 @@ static Array<TooltipSide, 4> TooltipSideOrder(TooltipPlacement placement) {
             return {TooltipSide::Right, TooltipSide::Left, TooltipSide::Below, TooltipSide::Above};
         case TooltipPlacement::LeftThenRight:
             return {TooltipSide::Left, TooltipSide::Right, TooltipSide::Below, TooltipSide::Above};
+        case TooltipPlacement::RightThenBelow:
+            return {TooltipSide::Right, TooltipSide::Below, TooltipSide::Left, TooltipSide::Above};
     }
     PanicIfReached();
 }

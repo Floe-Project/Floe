@@ -112,9 +112,15 @@ enum class GuiBuilderPass : u8 {
 };
 
 // Sides are tried in the order named. The first side is strongly preferred: text is wrapped narrower to fit
-// there, and only when even the minimum width doesn't fit is the next side tried. The other axis is tried
-// after the named pair.
-enum class TooltipPlacement : u8 { BelowThenAbove, AboveThenBelow, RightThenLeft, LeftThenRight };
+// there, and only when even the minimum width doesn't fit is the next side tried. The remaining sides are
+// tried after the named ones.
+enum class TooltipPlacement : u8 {
+    BelowThenAbove,
+    AboveThenBelow,
+    RightThenLeft,
+    LeftThenRight,
+    RightThenBelow,
+};
 
 // Two boxes: the value popup (regular font, nearest the element) and the tooltip (italic, stacked beside
 // the value popup). Either is skipped when its opacity is 0.

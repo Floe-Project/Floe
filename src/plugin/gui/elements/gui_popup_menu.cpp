@@ -90,6 +90,8 @@ Box MenuItem(GuiBuilder& builder, Box parent, MenuItemOptions const& options, u6
                       .contents_direction = layout::Direction::Row,
                   },
                   .tooltip = options.tooltip,
+                  .tooltip_avoid_viewport_id = builder.imgui.curr_viewport->id,
+                  .tooltip_placement = TooltipPlacement::RightThenBelow,
                   .button_behaviour = disabled ? Optional<imgui::ButtonConfig> {}
                                                : Optional<imgui::ButtonConfig> {imgui::ButtonConfig {}},
               });

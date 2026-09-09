@@ -880,6 +880,10 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
 
         case CLAP_EVENT_MIDI: {
             auto const midi = (clap_event_midi const&)event;
+
+            // Some hosts send events whose first byte isn't a status byte.
+            if (midi.data[0] < 0x80) break;
+
             MidiMessage const message {
                 .status = midi.data[0],
                 .data1 = midi.data[1],

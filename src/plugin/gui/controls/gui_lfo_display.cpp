@@ -220,9 +220,9 @@ void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out)
     auto const rate_hz = ({
         f32 hz;
         if (sync_on) {
-            auto const synced = (param_values::LfoSyncedRate)Clamp(Round(rate_adj_linear),
-                                                                   rate_param.info.linear_range.min,
-                                                                   rate_param.info.linear_range.max);
+            // ParamToInt, not rounding: the value readout and the DSP both truncate, so anything else
+            // steps at a different point in the drag to what's shown and heard.
+            auto const synced = ParamToInt<param_values::LfoSyncedRate>(rate_adj_linear);
             hz = SyncedTimeToHz(k_reference_bpm, SyncedTimesFromParam(synced));
         } else {
             hz = rate_param.info.ProjectValue(rate_adj_linear);

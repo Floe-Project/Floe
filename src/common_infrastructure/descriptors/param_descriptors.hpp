@@ -1698,6 +1698,50 @@ constexpr Span<String const> MenuItems(ParamDescriptor::MenuType type) {
     return {};
 }
 
+// Whether the menu's options form a monotonic scale (note divisions, for example) rather than a set of
+// unrelated modes. Only these are worth offering a drag-to-change affordance on.
+constexpr bool MenuIsOrderedScale(ParamDescriptor::MenuType type) {
+    switch (type) {
+        case ParamDescriptor::MenuType::LegacyLfoSyncedRate:
+        case ParamDescriptor::MenuType::LfoSyncedRate:
+        case ParamDescriptor::MenuType::LegacyDelaySyncedTime:
+        case ParamDescriptor::MenuType::DelaySyncedTime:
+        case ParamDescriptor::MenuType::LegacyArpSyncedRate:
+        case ParamDescriptor::MenuType::ArpSyncedRate: return true;
+
+        case ParamDescriptor::MenuType::None:
+        case ParamDescriptor::MenuType::LoopMode:
+        case ParamDescriptor::MenuType::LegacyEqType:
+        case ParamDescriptor::MenuType::EqType:
+        case ParamDescriptor::MenuType::LfoRestartMode:
+        case ParamDescriptor::MenuType::LegacyLfoDestination:
+        case ParamDescriptor::MenuType::LfoDestination:
+        case ParamDescriptor::MenuType::LegacyLfoShape:
+        case ParamDescriptor::MenuType::LegacyLfoShapeV2:
+        case ParamDescriptor::MenuType::LfoShape:
+        case ParamDescriptor::MenuType::LegacyLayerFilterType:
+        case ParamDescriptor::MenuType::LayerFilterType:
+        case ParamDescriptor::MenuType::LegacyEffectFilterType:
+        case ParamDescriptor::MenuType::EffectFilterType:
+        case ParamDescriptor::MenuType::LegacyDistortionType:
+        case ParamDescriptor::MenuType::DistortionType:
+        case ParamDescriptor::MenuType::CompressorType:
+        case ParamDescriptor::MenuType::DelayMode:
+        case ParamDescriptor::MenuType::VelocityMappingMode:
+        case ParamDescriptor::MenuType::MonophonicMode:
+        case ParamDescriptor::MenuType::StereoWidenMode:
+        case ParamDescriptor::MenuType::PlayMode:
+        case ParamDescriptor::MenuType::ArpMode:
+        case ParamDescriptor::MenuType::ArpNoteOrder:
+        case ParamDescriptor::MenuType::ArpTriggerMode:
+        case ParamDescriptor::MenuType::ArpOctavePolyrate:
+        case ParamDescriptor::MenuType::ArpAutoRate:
+        case ParamDescriptor::MenuType::MpeDestination:
+        case ParamDescriptor::MenuType::Count: break;
+    }
+    return false;
+}
+
 namespace val_config_helpers {
 
 using ValConfig = ParamDescriptor::ConstructorArgs::ValueConfig;

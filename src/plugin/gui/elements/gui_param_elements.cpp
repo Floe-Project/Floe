@@ -16,6 +16,7 @@
 #include "gui/overlays/gui_confirmation_dialog.hpp"
 #include "gui/panels/gui_legacy_params_panel.hpp"
 #include "gui/panels/gui_macros.hpp"
+#include "gui_framework/gui_frame.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "processing_utils/filters.hpp"
 #include "processor/param.hpp"
@@ -619,13 +620,43 @@ Box DoMenuParameter(GuiState& g,
         new_val = val;
     }
 
+    // Menus whose options are a scale rather than a set of modes can also be dragged like a slider.
+    auto const draggable = MenuIsOrderedScale(param.info.menu_type);
+
+    static bool slider_value_changed_during_interaction = false;
     if (auto const viewport_r = BoxRect(g.builder, menu_btn)) {
         auto const window_r = g.builder.imgui.RegisterAndConvertRect(*viewport_r);
 
         if (!legacy_override) {
-            if (menu_btn.button_fired) g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
+            if (draggable) {
+                if (g.imgui.WasJustActivated(menu_btn.imgui_id, MouseButton::Left)) {
+                    slider_value_changed_during_interaction = false;
+                    ParameterJustStartedMoving(g.engine.processor, param.info.index);
+                }
+
+                auto const initial_int_val = param.IntValue<int>();
+                auto current = param.LinearValue();
+                if (g.builder.imgui.SliderBehaviourRange({
+                        .rect_in_window_coords = window_r,
+                        .id = menu_btn.imgui_id,
+                        .min = param.info.linear_range.min,
+                        .max = param.info.linear_range.max,
+                        .value = current,
+                        .default_value = param.info.default_linear_value,
+                        .cfg = {.sensitivity = WwToPixels(20.0f)},
+                    })) {
+                    new_val = current;
+                    if ((int)current != initial_int_val) slider_value_changed_during_interaction = true;
+                }
+            }
+
+            if (menu_btn.button_fired && !(draggable && slider_value_changed_during_interaction))
+                g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
 
             if (new_val) SetParameterValue(g.engine.processor, param.info.index, *new_val, {});
+
+            if (draggable && g.imgui.WasJustDeactivated(menu_btn.imgui_id, MouseButton::Left))
+                ParameterJustStoppedMoving(g.engine.processor, param.info.index);
 
             AddParamContextMenuBehaviour(g, window_r, menu_btn.imgui_id, param);
         }

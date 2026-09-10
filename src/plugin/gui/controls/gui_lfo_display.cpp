@@ -108,7 +108,9 @@ static void DoLfoDisplayDrag(GuiState& g,
     }
 
     if (imgui.IsActive(id, MouseButton::Left)) {
-        if (frame_input.Key(KeyCode::ShiftL).presses.size || frame_input.Key(KeyCode::ShiftR).presses.size)
+        // Re-anchor when fine control is engaged or released so the handle doesn't jump.
+        if (frame_input.Key(KeyCode::ShiftL).presses.size || frame_input.Key(KeyCode::ShiftR).presses.size ||
+            frame_input.Key(KeyCode::ShiftL).releases.size || frame_input.Key(KeyCode::ShiftR).releases.size)
             anchor_drag();
 
         if (All(frame_input.cursor_pos != -1)) {
@@ -152,7 +154,7 @@ static void DoLfoDisplayDrag(GuiState& g,
         window_r,
         {
             .value_popup = FunctionRef<String()> {[&]() -> String {
-                return ParamValuePopupText(popup_params, g.scratch_arena);
+                return ParamValuePopupText(g, popup_params, g.scratch_arena);
             }},
             .tooltip = FunctionRef<String()> {[&]() -> String {
                 constexpr String k_description =

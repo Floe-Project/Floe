@@ -354,9 +354,42 @@ void DoEnvelopeGui(GuiState& g,
         f32x2 const grabber_max {adsr_points[k_sustain_index].x, viewport_r.Bottom()};
         auto const grabber = imgui.RegisterAndConvertRect(Rect::FromMinMax(grabber_min, grabber_max));
 
-        static f32x2 rel_click_pos;
-        if (imgui.ButtonBehaviour(grabber, dec_sus_imgui_id, imgui::SliderConfig::k_activation_cfg))
-            rel_click_pos = GuiIo().in.cursor_pos - imgui.ViewportPosToWindowPos(adsr_points[k_decay_index]);
+        auto const& frame_input = GuiIo().in;
+
+        // Pixels that a full 0 to 1 move of each parameter covers, so an unmodified drag keeps the handle
+        // under the cursor.
+        auto const decay_pixels_for_range = get_x_coord_at_percent(1) - get_x_coord_at_percent(0);
+        auto const sustain_pixels_for_range = get_y_coord_at_percent(1) - get_y_coord_at_percent(0);
+        ASSERT(decay_pixels_for_range > 0);
+        ASSERT(sustain_pixels_for_range > 0);
+
+        static f32x2 drag_start_pos;
+        static f32 decay_at_drag_start;
+        static f32 sustain_at_drag_start;
+
+        auto const anchor_drag = [&]() {
+            drag_start_pos = frame_input.cursor_pos;
+            decay_at_drag_start = decay_param.LinearValue();
+            sustain_at_drag_start = sustain_param.LinearValue();
+        };
+
+        if (imgui.ButtonBehaviour(grabber, dec_sus_imgui_id, imgui::SliderConfig::k_activation_cfg)) {
+            ParameterJustStartedMoving(engine.processor, indices[k_decay_index]);
+            ParameterJustStartedMoving(engine.processor, indices[k_sustain_index]);
+
+            if (frame_input.modifiers.Get(ModifierKey::Modifier)) {
+                SetParameterValue(engine.processor,
+                                  indices[k_decay_index],
+                                  decay_param.DefaultLinearValue(),
+                                  {});
+                SetParameterValue(engine.processor,
+                                  indices[k_sustain_index],
+                                  sustain_param.DefaultLinearValue(),
+                                  {});
+            }
+
+            anchor_drag();
+        }
 
         if (imgui.ButtonBehaviour(grabber,
                                   dec_sus_imgui_id,
@@ -374,30 +407,27 @@ void DoEnvelopeGui(GuiState& g,
         if (imgui.IsHotOrActive(dec_sus_imgui_id, MouseButton::Left))
             GuiIo().out.wants.cursor_type = CursorType::AllArrows;
 
-        if (imgui.WasJustActivated(dec_sus_imgui_id, MouseButton::Left)) {
-            ParameterJustStartedMoving(engine.processor, indices[k_decay_index]);
-            ParameterJustStartedMoving(engine.processor, indices[k_sustain_index]);
-        }
         if (imgui.IsActive(dec_sus_imgui_id, MouseButton::Left)) {
-            {
-                auto const min_pixels_pos = imgui.ViewportPosToWindowPos({get_x_coord_at_percent(0), 0}).x;
-                auto const max_pixels_pos = imgui.ViewportPosToWindowPos({get_x_coord_at_percent(1), 0}).x;
-                auto curr_pos = GuiIo().in.cursor_pos.x - rel_click_pos.x;
+            // Re-anchor when fine control is engaged or released so the handle doesn't jump.
+            if (frame_input.Key(KeyCode::ShiftL).presses.size ||
+                frame_input.Key(KeyCode::ShiftR).presses.size ||
+                frame_input.Key(KeyCode::ShiftL).releases.size ||
+                frame_input.Key(KeyCode::ShiftR).releases.size)
+                anchor_drag();
 
-                curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
-                auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
+            if (All(frame_input.cursor_pos != -1)) {
+                auto const slower = frame_input.modifiers.Get(ModifierKey::Shift) ? 4.0f : 1.0f;
+                auto const delta = frame_input.cursor_pos - drag_start_pos;
 
-                SetParameterValue(engine.processor, indices[k_decay_index], curr_pos_percent, {});
-            }
-            {
-                auto const min_pixels_pos = imgui.ViewportPosToWindowPos({0, get_y_coord_at_percent(0)}).y;
-                auto const max_pixels_pos = imgui.ViewportPosToWindowPos({0, get_y_coord_at_percent(1)}).y;
-                auto curr_pos = GuiIo().in.cursor_pos.y - rel_click_pos.y;
+                auto const new_decay =
+                    Clamp01(decay_at_drag_start + (delta.x / (decay_pixels_for_range * slower)));
+                auto const new_sustain =
+                    Clamp01(sustain_at_drag_start - (delta.y / (sustain_pixels_for_range * slower)));
 
-                curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
-                auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
-
-                SetParameterValue(engine.processor, indices[k_sustain_index], 1 - curr_pos_percent, {});
+                if (new_decay != decay_param.LinearValue())
+                    SetParameterValue(engine.processor, indices[k_decay_index], new_decay, {});
+                if (new_sustain != sustain_param.LinearValue())
+                    SetParameterValue(engine.processor, indices[k_sustain_index], new_sustain, {});
             }
         }
 

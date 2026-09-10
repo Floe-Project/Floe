@@ -158,6 +158,20 @@ static String GrabberTooltipFooter(ArenaAllocator& arena, GrabberInteractions co
     return buf.ToOwnedSpan();
 }
 
+// Whole-graph tooltip describing what the display is and what the gridlines mean. Registered before the
+// node grabbers so that hovering a handle takes priority over this larger area.
+static void DoFilterGraphAreaTooltip(GuiState& g, Rect viewport_r, String description) {
+    auto const id = g.imgui.MakeId("filter_graph_area");
+    auto const window_r = g.imgui.ViewportRectToWindowRect(viewport_r);
+    g.imgui.RegisterRectForMouseTracking(window_r, false);
+    g.imgui.SetHot(window_r, id);
+    String const tooltip_text =
+        fmt::Format(g.scratch_arena,
+                    "{} Vertical lines: 100 Hz, 1 kHz, 10 kHz. Horizontal lines: every 6 dB.",
+                    description);
+    Tooltip(g, id, window_r, {.tooltip = tooltip_text});
+}
+
 struct GrabberDrawOptions {
     f32x2 node_pos_viewport;
     f32 handle_radius;
@@ -174,14 +188,15 @@ static void DrawGrabberHandleAndPopup(GuiState& g, GrabberDrawOptions const& opt
     // Note names vary in length as you drag (sharps make them longer), which otherwise makes the popup
     // resize/jump every frame. Hz/kHz display doesn't have this problem, so only fix the width when note
     // names are shown.
-    Optional<f32> const popup_fixed_width = ShowCutoffInSemitones(g.prefs) ? Optional<f32> {150.0f} : k_nullopt;
+    Optional<f32> const popup_fixed_width =
+        ShowCutoffInSemitones(g.prefs) ? Optional<f32> {150.0f} : k_nullopt;
     ParameterTooltip(g,
                      opt.popup_params,
                      opt.interaction_id,
                      opt.grabber_window_r,
                      g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r),
                      GrabberTooltipFooter(g.scratch_arena, opt.interactions),
-                     "Vertical lines: 100 Hz, 1 kHz, 10 kHz\nHorizontal lines: every 6 dB"_s,
+                     {},
                      popup_fixed_width);
     filter_graph_draw::DrawHandle(g.imgui,
                                   g.imgui.ViewportPosToWindowPos(opt.node_pos_viewport),
@@ -374,6 +389,7 @@ void DoFilterGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out
     auto const reso_index = ParamIndexFromLayerParamIndex(layer_index, LayerParamIndex::FilterResonance);
 
     filter_graph_draw::DrawBackground(imgui, viewport_r, cutoff_param.info);
+    DoFilterGraphAreaTooltip(g, viewport_r, "This layer's filter."_s);
 
     auto const node_pos = [&] {
         return f32x2 {viewport_r.x + (cutoff_param.LinearValue() * viewport_r.w),
@@ -554,6 +570,7 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
     auto const type_param = params.DescribedValue(ParamIndex::FilterType);
 
     filter_graph_draw::DrawBackground(imgui, viewport_r, cutoff_param.info);
+    DoFilterGraphAreaTooltip(g, viewport_r, "The Filter effect's response."_s);
 
     auto const uses_gain =
         param_values::EffectFilterTypeUsesGain(type_param.IntValue<param_values::EffectFilterType>());
@@ -718,6 +735,9 @@ void DoReverbPreFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
+    DoFilterGraphAreaTooltip(g,
+                             viewport_r,
+                             "The reverb's pre-filter, applied before the signal enters the reverb."_s);
 
     auto const lp_param = params.DescribedValue(ParamIndex::ReverbPreLowPassCutoff);
     auto const hp_param = params.DescribedValue(ParamIndex::ReverbPreHighPassCutoff);
@@ -815,6 +835,7 @@ void DoReverbPostShelfGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
+    DoFilterGraphAreaTooltip(g, viewport_r, "The reverb's post-filter, applied to the reverb's output."_s);
 
     auto const lo_cut_param = params.DescribedValue(ParamIndex::ReverbLowShelfCutoff);
     auto const lo_gain_param = params.DescribedValue(ParamIndex::ReverbLowShelfGain);
@@ -949,6 +970,7 @@ void DoConvolutionReverbHighpassGraph(GuiState& g, Rect viewport_r, bool greyed_
     auto const cutoff_param = params.DescribedValue(ParamIndex::ConvolutionReverbHighpass);
 
     filter_graph_draw::DrawBackground(imgui, viewport_r, cutoff_param.info);
+    DoFilterGraphAreaTooltip(g, viewport_r, "The convolution reverb's highpass filter."_s);
 
     auto const node_pos = [&] {
         return f32x2 {viewport_r.x + (cutoff_param.LinearValue() * viewport_r.w),
@@ -1041,6 +1063,7 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
+    DoFilterGraphAreaTooltip(g, viewport_r, "The delay's filter, applied to the repeats."_s);
 
     auto const cutoff_param = params.DescribedValue(ParamIndex::DelayFilterCutoffSemitones);
     auto const spread_param = params.DescribedValue(ParamIndex::DelayFilterSpread);
@@ -1273,8 +1296,11 @@ DoEqBandRightClickMenu(GuiState& g, Rect window_r, imgui::Id interaction_id, EqB
         });
 }
 
-static void
-DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r, bool greyed_out) {
+static void DoEqGraphImpl(GuiState& g,
+                          Span<EqBandParams const> band_params,
+                          Rect viewport_r,
+                          bool greyed_out,
+                          String description) {
     auto& imgui = g.imgui;
     auto& engine = g.engine;
     auto& params = engine.processor.main_params;
@@ -1292,6 +1318,7 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
     auto const& freq_info = k_param_descriptors[ToInt(band_params[0].freq)];
 
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
+    DoFilterGraphAreaTooltip(g, viewport_r, description);
 
     struct Band {
         EqBandParams params;
@@ -1439,9 +1466,9 @@ void DoEqGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out) {
     Array<EqBandParams, k_num_eq_bands> bands {};
     for (auto const i : Range(k_num_eq_bands))
         bands[i] = LayerEqBandParams(layer_index, i);
-    DoEqGraphImpl(g, bands, viewport_r, greyed_out);
+    DoEqGraphImpl(g, bands, viewport_r, greyed_out, "This layer's 3-band EQ."_s);
 }
 
 void DoEffectEqGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
-    DoEqGraphImpl(g, k_effect_eq_band_params, viewport_r, greyed_out);
+    DoEqGraphImpl(g, k_effect_eq_band_params, viewport_r, greyed_out, "The EQ effect's 3-band response."_s);
 }

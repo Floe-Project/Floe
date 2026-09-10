@@ -158,7 +158,7 @@ static void DoLfoDisplayDrag(GuiState& g,
             }},
             .tooltip = FunctionRef<String()> {[&]() -> String {
                 constexpr String k_description =
-                    "A preview of the LFO's movement: the current Shape at the current Amount, with faster Time settings showing more cycles. When Sync is on, it's drawn as it would run at 120 BPM."_s;
+                    "A preview of the LFO's settings: the current Shape at the current Amount, with faster Time settings showing more cycles."_s;
                 if (greyed_out)
                     return fmt::Format(g.scratch_arena,
                                        "{}\n\nThe LFO is off right now, so this is only a preview.",

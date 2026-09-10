@@ -1221,7 +1221,7 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                           .size_from_text = true,
                           .font = FontType::Icons,
                           .text_colours = {Col {.c = Col::Yellow}},
-                          .tooltip = warning_tooltip,
+                          .value_popup = warning_tooltip,
                       });
 
             DoBox(g.builder,

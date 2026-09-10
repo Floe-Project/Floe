@@ -22,8 +22,10 @@ Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_i
     switch (param.menu_type) {
         case ParamDescriptor::MenuType::LayerFilterType:
             return LayerFilterTypeDescription((param_values::LayerFilterType)item_index);
-        case ParamDescriptor::MenuType::LfoShape:
-            return LfoShapeDescription((param_values::LfoShape)item_index);
+        case ParamDescriptor::MenuType::LfoShape: {
+            auto const description = LfoShapeDescription((param_values::LfoShape)item_index);
+            return description.size ? Optional<String> {description} : k_nullopt;
+        }
         case ParamDescriptor::MenuType::LfoDestination:
             return LfoDestinationDescription((param_values::LfoDestination)item_index);
         case ParamDescriptor::MenuType::LfoRestartMode:

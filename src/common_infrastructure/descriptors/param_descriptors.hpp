@@ -601,7 +601,7 @@ static_assert(k_lfo_destination_strings.size == ToInt(LfoDestination::Count));
 constexpr String LfoDestinationDescription(LfoDestination dest) {
     switch (dest) {
         case LfoDestination::Volume:
-            return "Wobbles the layer's level for a tremolo effect. The LFO only ever turns the layer down: at full Amount it dips between the layer's level and silence."_s;
+            return "Dips the layer's level down from the volume slider's setting. The top of the dip always stays at the slider's level; Amount controls how far down towards silence the bottom reaches, hitting silence at full Amount."_s;
         case LfoDestination::Filter:
             return "Sweeps the cutoff of the filter on the MAIN tab. At full Amount it moves the cutoff by up to half the knob's travel either way. The filter needs to be switched on to hear it."_s;
         case LfoDestination::Pan:
@@ -695,27 +695,18 @@ static_assert(k_lfo_shape_strings.size == ToInt(LfoShape::Count));
 constexpr String LfoShapeDescription(LfoShape shape) {
     switch (shape) {
         case LfoShape::Sine:
-            return "A smooth, even wave. The gentlest option, and the natural choice for vibrato and tremolo."_s;
         case LfoShape::Triangle:
-            return "Rises and falls in straight lines at a steady speed. A little more insistent than a sine."_s;
         case LfoShape::Sawtooth:
-            return "Ramps steadily down, then jumps back to the top and starts again. Set a negative Amount to flip it into a rising ramp."_s;
         case LfoShape::Square:
-            return "Flicks between two extremes, spending half of each cycle at each. Abrupt, on-or-off movement."_s;
-        case LfoShape::RandomSteps:
-            return "Jumps to a new random value at the start of each cycle and holds it there, like a classic sample-and-hold. The random shapes run at twice the Time setting's rate."_s;
-        case LfoShape::RandomGlide:
-            return "Slides smoothly from one random value to the next, picking a new one each cycle. The random shapes run at twice the Time setting's rate."_s;
         case LfoShape::Pluck:
-            return "Jumps to the top of each cycle and falls away like a plucked string: quickly at first, then easing off. Handy on Volume for a rhythmic, plucked feel."_s;
         case LfoShape::PluckSharp:
-            return "Like Pluck, but with a much quicker fall for a snappier, more percussive attack."_s;
         case LfoShape::PulseNarrow:
-            return "Sits at the top for a quarter of each cycle and at the bottom for the rest: a short, sharp blip."_s;
         case LfoShape::PulseWide:
-            return "Sits at the top for three quarters of each cycle, with a brief dip to the bottom."_s;
-        case LfoShape::Trapezoid:
-            return "A square with the corners knocked off: it flicks between two extremes but takes a short ramp to get from one to the other, so it's smoother than Square."_s;
+        case LfoShape::Trapezoid: return {};
+        case LfoShape::RandomSteps:
+            return "Unlike the other shapes, this runs freely rather than following a fixed pattern: it jumps to a new random value at the start of every cycle and holds it there, like a classic sample-and-hold."_s;
+        case LfoShape::RandomGlide:
+            return "Unlike the other shapes, this runs freely rather than following a fixed pattern: it picks a new random value every cycle and slides smoothly from the previous one to it."_s;
         case LfoShape::Count: break;
     }
     return {};
@@ -3702,7 +3693,7 @@ consteval auto CreateParams() {
             .gui_label = "LFO"_s,
             .tooltip =
                 "Switch this layer's LFO on or off.\n\n"
-                "The LFO (low frequency oscillator) is a slow, repeating wave that moves one of this layer's controls in a repeating pattern, such as adding a tremolo effect."_s,
+                "Enable Floe's LFO (low frequency oscillator) for adding movement to a one of this layer's controls (such as the volume or filter cutoff)."_s,
         };
         lp(LegacyLfoShape) = Args {
             .id = id(region, 28), // never change
@@ -3794,7 +3785,7 @@ consteval auto CreateParams() {
             .name = "Time (Hz)"_s,
             .gui_label = "Time"_s,
             .tooltip =
-                "Time sets how fast the LFO cycles, in Hz (cycles per second). It runs from a slow 0.1 Hz, one cycle every ten seconds, up to a fluttering 20 Hz.\n\n"
+                "Time sets how fast the LFO cycles, in Hz (cycles per second).\n\n"
                 "Tip: for movement that stays in time with your track, switch Sync on and choose a note length instead."_s,
         };
         lp(LfoSyncSwitch) = Args {
@@ -3835,7 +3826,7 @@ consteval auto CreateParams() {
             .name = "Shape"_s,
             .gui_label = "Shape"_s,
             .tooltip =
-                "Choose the Shape of the LFO. Alongside the classics there are a few more interesting options, such as random and plucky shapes. Hover over each menu item for a description."_s,
+                "Choose the Shape of the LFO. Alongside the classics there are a few more interesting options, such as random and plucky shapes."_s,
         };
         lp(LfoDestination) = Args {
             .id = id(region, 68), // never change

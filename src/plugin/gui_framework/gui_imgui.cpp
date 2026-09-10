@@ -2572,8 +2572,11 @@ Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, 
 
     TooltipOpacities result {};
 
-    // WasJustDeactivated bridges the frame between releasing a drag and becoming hot again.
-    auto const settled_hot = IsHot(id) && SecondsSpentHot() >= k_settle_secs;
+    // WasJustDeactivated bridges the frame between releasing a drag and becoming hot again. An item can't
+    // be hot while it's active, so a released drag restarts the hot timer: skip the settle delay if the
+    // popup is already showing for this item, else it'd blink off for the settle duration.
+    auto const settled_hot =
+        IsHot(id) && (SecondsSpentHot() >= k_settle_secs || immediate_tooltip_item == id);
     if (settled_hot || IsActive(id) || WasJustDeactivated(id)) {
         if (immediate_tooltip_item != id) {
             immediate_tooltip_item = id;

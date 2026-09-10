@@ -130,6 +130,8 @@ struct DrawTooltipArgs {
     TooltipPlacement placement;
     String value_popup {};
     f32 value_popup_opacity = 0;
+    // WW units. See TooltipArgs::value_popup_fixed_width.
+    Optional<f32> value_popup_fixed_width {};
     String tooltip {};
     String tooltip_footer {}; // Drawn dimmer beneath the tooltip text, inside the same box.
     f32 tooltip_opacity = 0;
@@ -314,6 +316,10 @@ Optional<Rect> BoxRect(GuiBuilder& builder, Box const& box);
 // BoxConfig::tooltip. Returns true if anything was drawn.
 struct TooltipArgs {
     TooltipString value_popup = k_nullopt;
+    // WW units. When set, the value popup box always uses this width instead of sizing to fit the text.
+    // Use this when the text length varies between frames (e.g. a cutoff frequency shown as a note name,
+    // where sharps change the string length) so the popup doesn't resize/jump as the value changes.
+    Optional<f32> value_popup_fixed_width {};
     TooltipString tooltip = k_nullopt;
     String tooltip_footer {};
     Optional<Rect> avoid_r {}; // Window coords. If nullopt, uses the element's rect.

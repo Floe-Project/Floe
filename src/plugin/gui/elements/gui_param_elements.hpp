@@ -161,8 +161,8 @@ constexpr String ParamClickableTooltipFooter(DescribedParamValue const& param) {
 }
 
 // Value readout: just the value for a single parameter, "Label: value" lines for several.
-String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocator& arena);
-String ParamValuePopupText(DescribedParamValue const& param, ArenaAllocator& arena);
+String ParamValuePopupText(GuiState const& g, Span<DescribedParamValue const*> params, ArenaAllocator& arena);
+String ParamValuePopupText(GuiState const& g, DescribedParamValue const& param, ArenaAllocator& arena);
 
 void AddParamContextMenuBehaviour(GuiState& g, Rect window_r, imgui::Id id, DescribedParamValue const& param);
 void AddParamContextMenuBehaviour(GuiState& g,
@@ -185,6 +185,8 @@ bool ConsumeParamTextEditorRequest(GuiState& g, ParamIndex param, imgui::Id widg
 // avoid_r: region the popups are placed outside of. If nullopt, uses window_r.
 // tooltip_note: extra paragraph appended after the parameter descriptions, for things the widget knows
 // about but the parameters don't.
+// value_popup_fixed_width: see TooltipArgs::value_popup_fixed_width. Use when a param's displayed value
+// can change width between frames (e.g. a note name), to stop the popup resizing/jumping.
 void ParameterTooltip(GuiState& g,
                       DescribedParamValue const& param,
                       imgui::Id imgui_id,
@@ -197,4 +199,5 @@ void ParameterTooltip(GuiState& g,
                       Rect window_r,
                       Optional<Rect> avoid_r,
                       String tooltip_footer,
-                      String tooltip_note = {});
+                      String tooltip_note = {},
+                      Optional<f32> value_popup_fixed_width = k_nullopt);

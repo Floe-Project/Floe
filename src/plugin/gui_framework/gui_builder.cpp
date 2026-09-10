@@ -207,6 +207,7 @@ bool Tooltip(GuiBuilder& builder, imgui::Id id, Rect rect_in_window_coords, Tool
                                     .placement = args.placement,
                                     .value_popup = value_popup,
                                     .value_popup_opacity = value_popup.size ? value_popup_opacity : 0,
+                                    .value_popup_fixed_width = args.value_popup_fixed_width,
                                     .tooltip = tooltip,
                                     .tooltip_footer = tooltip.size ? args.tooltip_footer : String {},
                                     .tooltip_opacity = tooltip.size ? opacities.delayed : 0,

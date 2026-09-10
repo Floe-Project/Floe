@@ -293,6 +293,7 @@ struct ParamFlags {
     // params as {id, value} pairs - unknown IDs are skipped on load, so removed experimental params are
     // harmlessly ignored.
     u8 experimental : 1;
+    u8 cutoff_frequency : 1; // Will be displayed either semitones or hz - user's preference.
 };
 
 enum class ParameterModule : u8 {
@@ -1574,8 +1575,11 @@ struct ParamDescriptor {
         return projected_value;
     }
 
-    Optional<f32> StringToLinearValue(String str) const;
-    Optional<DynamicArrayBounded<char, 128>> LinearValueToString(f32 linear_value) const;
+    // show_cutoff_in_semitones only has any effect on params with flags.cutoff_frequency set: nullopt keeps
+    // the param's native display_format, otherwise it overrides the unit to Hz (false) or semitones (true).
+    Optional<f32> StringToLinearValue(String str, Optional<bool> show_cutoff_in_semitones = k_nullopt) const;
+    Optional<DynamicArrayBounded<char, 128>>
+    LinearValueToString(f32 linear_value, Optional<bool> show_cutoff_in_semitones = k_nullopt) const;
 
     constexpr bool IsEffectParam() const { return module_parts[0] == ParameterModule::Effect; }
     constexpr bool IsLayerParam() const { return LayerIndexFromModule(module_parts[0]).HasValue(); }
@@ -2405,6 +2409,7 @@ consteval auto CreateParams() {
         .name = "Cutoff Frequency"_s,
         .gui_label = "Cutoff"_s,
         .tooltip = "Frequency of filter effect"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(LegacyFilterResonance) = Args {
         .id = id(IdRegion::Master, 18), // never change
@@ -2574,6 +2579,7 @@ consteval auto CreateParams() {
         .name = "High-pass"_s,
         .gui_label = "High-pass"_s,
         .tooltip = "High-pass filter cutoff"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(ChorusDepth) = Args {
         .id = id(IdRegion::Master, 25), // never change
@@ -2656,6 +2662,7 @@ consteval auto CreateParams() {
         .name = "Filter Cutoff"_s,
         .gui_label = "Filter"_s,
         .tooltip = "High/low frequency reduction"_s,
+        .flags = {.cutoff_frequency = true},
     };
 
     mp(DelayFilterSpread) = Args {
@@ -2811,6 +2818,7 @@ consteval auto CreateParams() {
         .gui_label = "Freq"_s,
         .tooltip = "Center frequency of the phaser filters"_s,
         .related_params_group = 0,
+        .flags = {.cutoff_frequency = true},
     };
     mp(PhaserShape) = Args {
         .id = id(IdRegion::Master, 85), // never change
@@ -2903,6 +2911,7 @@ consteval auto CreateParams() {
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
         .tooltip = "Band 1: frequency of this band"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance1) = Args {
         .id = id(IdRegion::Master, 124), // never change
@@ -2944,6 +2953,7 @@ consteval auto CreateParams() {
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
         .tooltip = "Band 2: frequency of this band"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance2) = Args {
         .id = id(IdRegion::Master, 128), // never change
@@ -2985,6 +2995,7 @@ consteval auto CreateParams() {
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
         .tooltip = "Band 3: frequency of this band"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance3) = Args {
         .id = id(IdRegion::Master, 132), // never change
@@ -3027,6 +3038,7 @@ consteval auto CreateParams() {
         .name = "High-pass"_s,
         .gui_label = "High-pass"_s,
         .tooltip = "Wet high-pass filter cutoff"_s,
+        .flags = {.cutoff_frequency = true},
     };
     mp(LegacyConvolutionReverbWet) = Args {
         .id = id(IdRegion::Master, 66), // never change
@@ -3102,6 +3114,7 @@ consteval auto CreateParams() {
         .gui_label = "Pre LP"_s,
         .tooltip = "Low-pass filter cutoff before reverb"_s,
         .related_params_group = 2,
+        .flags = {.cutoff_frequency = true},
     };
 
     mp(ReverbPreHighPassCutoff) = Args {
@@ -3113,6 +3126,7 @@ consteval auto CreateParams() {
         .gui_label = "Pre HP"_s,
         .tooltip = "High-pass filter cutoff before reverb"_s,
         .related_params_group = 2,
+        .flags = {.cutoff_frequency = true},
     };
 
     mp(ReverbLowShelfCutoff) = Args {
@@ -3124,6 +3138,7 @@ consteval auto CreateParams() {
         .gui_label = "Lo-Shelf"_s,
         .tooltip = "Low-pass filter cutoff after reverb"_s,
         .related_params_group = 3,
+        .flags = {.cutoff_frequency = true},
     };
 
     auto const shelf_gain_value_config = ParamDescriptor::ConstructorArgs::ValueConfig {
@@ -3153,6 +3168,7 @@ consteval auto CreateParams() {
         .gui_label = "Hi-Shelf"_s,
         .tooltip = "High-pass filter cutoff after reverb"_s,
         .related_params_group = 4,
+        .flags = {.cutoff_frequency = true},
     };
 
     mp(ReverbHighShelfGain) = Args {
@@ -3571,6 +3587,7 @@ consteval auto CreateParams() {
             .gui_label = "Cut"_s,
             .tooltip =
                 "Cutoff Frequency sets where the filter takes effect. The filter envelope and the LFO sweep the cutoff around this value, so it's the centre of any modulation rather than the starting point."_s,
+            .flags = {.cutoff_frequency = true},
         };
         lp(LegacyFilterResonance) = Args {
             .id = id(region, 20), // never change
@@ -3866,6 +3883,7 @@ consteval auto CreateParams() {
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
             .tooltip = "Band 1: frequency of this band"_s,
+            .flags = {.cutoff_frequency = true},
         };
         lp(LegacyEqResonance1) = Args {
             .id = id(region, 37), // never change
@@ -3942,6 +3960,7 @@ consteval auto CreateParams() {
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
             .tooltip = "Band 2: frequency of this band"_s,
+            .flags = {.cutoff_frequency = true},
         };
         lp(LegacyEqResonance2) = Args {
             .id = id(region, 41), // never change
@@ -4019,6 +4038,7 @@ consteval auto CreateParams() {
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
             .tooltip = "Band 3: frequency of this band"_s,
+            .flags = {.cutoff_frequency = true},
         };
         lp(EqResonance3) = Args {
             .id = id(region, 87), // never change

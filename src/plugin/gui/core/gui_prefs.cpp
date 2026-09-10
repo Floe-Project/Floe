@@ -51,6 +51,15 @@ prefs::Descriptor SettingDescriptor(GuiPreference setting) {
                 .gui_label = "Show LUFS meter",
                 .long_description = "Show the loudness (LUFS) meter and readouts in the top panel GUI.",
             };
+        case GuiPreference::ShowCutoffInSemitones:
+            return {
+                .key = "show-cutoff-in-semitones"_s,
+                .value_requirements = prefs::ValueType::Bool,
+                .default_value = false,
+                .gui_label = "Show filter/EQ cutoff in semitones",
+                .long_description =
+                    "Display filter and EQ cutoff/centre frequency parameters in semitones instead of Hz.",
+            };
         case GuiPreference::WindowWidth:
             return {
                 .key = prefs::key::k_window_width,
@@ -69,6 +78,10 @@ prefs::Descriptor SettingDescriptor(GuiPreference setting) {
             };
         case GuiPreference::Count: PanicIfReached();
     }
+}
+
+bool ShowCutoffInSemitones(prefs::Preferences const& preferences) {
+    return prefs::GetBool(preferences, SettingDescriptor(GuiPreference::ShowCutoffInSemitones));
 }
 
 Optional<UiSize> DesiredWindowSize(prefs::Preferences const& preferences) {

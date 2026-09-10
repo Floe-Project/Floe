@@ -953,7 +953,8 @@ static bool ClapParamsValueToText(clap_plugin_t const* plugin,
         auto const& desc = k_param_descriptors[index];
         if (!desc.linear_range.Contains((f32)value)) return false;
 
-        auto const str = desc.LinearValueToString((f32)value);
+        auto const str =
+            desc.LinearValueToString((f32)value, ShowCutoffInSemitones(g_shared_engine_systems->prefs));
         if (!str) return false;
 
         if (out_buffer_capacity < (str->size + 1)) return false;
@@ -987,7 +988,9 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
         auto const index = (usize)*opt_index;
 
         if (!Check(floe, param_value_text, k_func, "param_value_text is null")) return false;
-        if (auto v = k_param_descriptors[index].StringToLinearValue(FromNullTerminated(param_value_text))) {
+        if (auto v = k_param_descriptors[index].StringToLinearValue(
+                FromNullTerminated(param_value_text),
+                ShowCutoffInSemitones(g_shared_engine_systems->prefs))) {
             if (!Check(floe, out_value, k_func, "out_value is null")) return false;
             *out_value = (f64)*v;
             ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
@@ -1939,6 +1942,15 @@ HandleSizePreferenceChanged(FloePluginInstance& floe, prefs::Key const& key, pre
     }
 }
 
+static void HandleCutoffDisplayUnitPreferenceChanged(FloePluginInstance& floe, prefs::Key const& key) {
+    if (key != SettingDescriptor(GuiPreference::ShowCutoffInSemitones).key) return;
+
+    auto const host_params = (clap_host_params_t const*)floe.host.get_extension(&floe.host, CLAP_EXT_PARAMS);
+    if (!host_params) return;
+
+    host_params->rescan(&floe.host, CLAP_PARAM_RESCAN_TEXT);
+}
+
 void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::Value const* value) {
     ZoneScoped;
     if (PanicOccurred()) return;
@@ -1947,6 +1959,7 @@ void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::
     ASSERT(floe.engine);
 
     HandleSizePreferenceChanged(floe, key, value);
+    HandleCutoffDisplayUnitPreferenceChanged(floe, key);
 
     g_engine_callbacks.on_preference_changed(*floe.engine, key, value);
 }

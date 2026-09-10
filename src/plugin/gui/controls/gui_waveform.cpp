@@ -420,7 +420,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                     grabber_r,
                     {
                         .value_popup = FunctionRef<String()> {[&]() -> String {
-                            return ParamValuePopupText(param_obj, g.scratch_arena);
+                            return ParamValuePopupText(g, param_obj, g.scratch_arena);
                         }},
                         .tooltip = FunctionRef<String()> {[&]() -> String {
                             return tooltip_text.size ? tooltip_text
@@ -654,7 +654,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                         loop_region_r,
                         {
                             .value_popup = FunctionRef<String()> {[&]() -> String {
-                                return ParamValuePopupText(param_ptrs, g.scratch_arena);
+                                return ParamValuePopupText(g, param_ptrs, g.scratch_arena);
                             }},
                             .tooltip = "Drag to move the loop, keeping its length and crossfade"_s,
                             .avoid_r = g.imgui.ViewportRectToWindowRect(r),
@@ -689,7 +689,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 do_fixed_handle_tooltip(
                     g.imgui.MakeId("loop xfade inactive"),
                     grabber,
-                    ParamValuePopupText(param, g.scratch_arena),
+                    ParamValuePopupText(g, param, g.scratch_arena),
                     loop_start == 0
                         ? "The loop crossfade can't be used while the loop starts at the very beginning of the sample, because it needs audio before the loop start to blend in. Move the loop start later to enable it."_s
                         : "The loop crossfade can't be used because the loop has no length."_s);

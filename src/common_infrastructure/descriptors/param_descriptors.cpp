@@ -32,8 +32,39 @@ Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_i
     }
 }
 
-Optional<f32> ParamDescriptor::StringToLinearValue(String str) const {
+static f32 HzToSemitones(f32 hz) { return 12.0f * Log2(hz / 440.0f) + 69.0f; }
+static f32 SemitonesToHz(f32 semitones) { return 440.0f * Exp2((semitones - 69.0f) / 12.0f); }
+
+Optional<f32> ParamDescriptor::StringToLinearValue(String str,
+                                                   Optional<bool> show_cutoff_in_semitones) const {
     str = WhitespaceStripped(str);
+
+    // flags.cutoff_frequency params can be displayed/parsed as Hz or a note name independently of their
+    // native storage format, driven by the "show filter/EQ cutoff in semitones" preference.
+    if (flags.cutoff_frequency && show_cutoff_in_semitones) {
+        f32 hz;
+        if (*show_cutoff_in_semitones) {
+            f32 note_number;
+            if (auto const midi_note = MidiNoteFromName(str)) {
+                note_number = (f32)*midi_note;
+            } else {
+                auto const opt_value = ParseFloat(str);
+                if (!opt_value) return k_nullopt;
+                note_number = (f32)*opt_value;
+            }
+            hz = SemitonesToHz(note_number);
+        } else {
+            usize num_chars_read = 0;
+            auto const opt_value = ParseFloat(str, &num_chars_read);
+            if (!opt_value) return k_nullopt;
+            auto const suffix = WhitespaceStripped(str.SubSpan(num_chars_read));
+            hz = (f32)*opt_value;
+            if (StartsWithCaseInsensitiveAscii(suffix, "k"_s)) hz *= 1000.0f;
+        }
+
+        auto const native_value = display_format == ParamDisplayFormat::Semitones ? HzToSemitones(hz) : hz;
+        return LineariseValue(native_value, true);
+    }
 
     switch (display_format) {
         case ParamDisplayFormat::None: {
@@ -188,11 +219,26 @@ TEST_CASE(TestNumberStartsWithNegativeZero) {
     return k_success;
 }
 
-Optional<DynamicArrayBounded<char, 128>> ParamDescriptor::LinearValueToString(f32 linear_value) const {
+Optional<DynamicArrayBounded<char, 128>>
+ParamDescriptor::LinearValueToString(f32 linear_value, Optional<bool> show_cutoff_in_semitones) const {
     constexpr usize k_size = 128;
     using ResultType = DynamicArrayBounded<char, k_size>;
     ResultType result;
     auto const value = ProjectValue(linear_value);
+
+    if (flags.cutoff_frequency && show_cutoff_in_semitones) {
+        auto const hz = display_format == ParamDisplayFormat::Semitones ? SemitonesToHz(value) : value;
+        if (*show_cutoff_in_semitones) {
+            auto const note_number = RoundPositiveFloat(HzToSemitones(hz));
+            result = fmt::FormatInline<k_size>("{} (note {})", NoteName(note_number), note_number);
+        } else if (RoundPositiveFloat(hz) >= 1000)
+            result = fmt::FormatInline<k_size>("{.1} kHz", hz / 1000);
+        else
+            result = fmt::FormatInline<k_size>("{.0} Hz", hz);
+
+        if (NumberStartsWithNegativeZero(result)) dyn::Remove(result, 0);
+        return result;
+    }
 
     switch (display_format) {
         case ParamDisplayFormat::None: {
@@ -883,6 +929,37 @@ TEST_CASE(TestParamStringConversion) {
     return k_success;
 }
 
+TEST_CASE(TestCutoffSemitonesNoteNameDisplay) {
+    auto const& cutoff_param = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
+    REQUIRE(cutoff_param.flags.cutoff_frequency);
+
+    // 440 Hz is MIDI note 69, which is A3 in Floe's naming (middle C is C3).
+    auto const linear_value = cutoff_param.LineariseValue(440.0f, true);
+    REQUIRE(linear_value);
+
+    auto const str = cutoff_param.LinearValueToString(*linear_value, true);
+    REQUIRE(str);
+    tester.log.Debug("Cutoff note-name display: {}", *str);
+    CHECK_EQ(String {*str}, "A3 (note 69)"_s);
+
+    // Parsing the displayed note name should round-trip back to the same linear value.
+    auto const val_from_note_name = cutoff_param.StringToLinearValue(*str, true);
+    REQUIRE(val_from_note_name);
+    CHECK_APPROX_EQ(*val_from_note_name, *linear_value, 0.001f);
+
+    // Parsing a bare note name (as if the user typed it) should also work.
+    auto const val_from_bare_name = cutoff_param.StringToLinearValue("A3"_s, true);
+    REQUIRE(val_from_bare_name);
+    CHECK_APPROX_EQ(*val_from_bare_name, *linear_value, 0.001f);
+
+    // Parsing a plain number should still be treated as a note number, as before.
+    auto const val_from_number = cutoff_param.StringToLinearValue("69"_s, true);
+    REQUIRE(val_from_number);
+    CHECK_APPROX_EQ(*val_from_number, *linear_value, 0.001f);
+
+    return k_success;
+}
+
 TEST_CASE(TestLegacyConversion) {
     auto const i = ParamFromLegacyId("L0Vol");
     REQUIRE(i.HasValue());
@@ -928,4 +1005,5 @@ TEST_REGISTRATION(RegisterParamDescriptorTests) {
     REGISTER_TEST(TestParamStringConversion);
     REGISTER_TEST(TestParamIdStringsUnique);
     REGISTER_TEST(TestDistortionTypeCategoriesComplete);
+    REGISTER_TEST(TestCutoffSemitonesNoteNameDisplay);
 }

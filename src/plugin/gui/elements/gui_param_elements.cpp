@@ -7,6 +7,7 @@
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 
 #include "engine/engine.hpp"
+#include "gui/core/gui_prefs.hpp"
 #include "gui/core/gui_state.hpp"
 #include "gui/elements/gui_common_elements.hpp"
 #include "gui/elements/gui_element_drawing.hpp"
@@ -412,8 +413,12 @@ static void DoDistortionTypeMenuItems(GuiState& g, ParamIndex param_index) {
     }
 }
 
-String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocator& arena) {
-    if (params.size == 1) return arena.Clone(*params[0]->info.LinearValueToString(params[0]->LinearValue()));
+String
+ParamValuePopupText(GuiState const& g, Span<DescribedParamValue const*> params, ArenaAllocator& arena) {
+    auto const show_cutoff_in_semitones = ShowCutoffInSemitones(g.prefs);
+    if (params.size == 1)
+        return arena.Clone(
+            *params[0]->info.LinearValueToString(params[0]->LinearValue(), show_cutoff_in_semitones));
 
     DynamicArray<char> buf {arena};
     for (auto param : params) {
@@ -421,15 +426,15 @@ String ParamValuePopupText(Span<DescribedParamValue const*> params, ArenaAllocat
         fmt::Append(buf,
                     "{}: {}",
                     param->info.gui_label,
-                    *param->info.LinearValueToString(param->LinearValue()));
+                    *param->info.LinearValueToString(param->LinearValue(), show_cutoff_in_semitones));
         if (param != Last(params)) dyn::Append(buf, '\n');
     }
     return buf.ToOwnedSpan();
 }
 
-String ParamValuePopupText(DescribedParamValue const& param, ArenaAllocator& arena) {
+String ParamValuePopupText(GuiState const& g, DescribedParamValue const& param, ArenaAllocator& arena) {
     auto param_ptr = &param;
-    return ParamValuePopupText({&param_ptr, 1}, arena);
+    return ParamValuePopupText(g, {&param_ptr, 1}, arena);
 }
 
 static void DoParamMenuItems(GuiState& g, ParamIndex param_index) {
@@ -768,7 +773,7 @@ Box DoKnobParameter(GuiState& g,
             .value_popup = FunctionRef<String()> {[&]() -> String {
                 if (options.override_value_popup.size) return options.override_value_popup;
                 if (options.is_fake) return {};
-                auto const text = ParamValuePopupText(param, g.builder.arena);
+                auto const text = ParamValuePopupText(g, param, g.builder.arena);
                 if (inactive_reason_in_popup)
                     return fmt::Format(g.builder.arena, "{} (inactive: {})", text, options.inactive_reason);
                 return text;
@@ -783,7 +788,8 @@ Box DoKnobParameter(GuiState& g,
         });
 
     auto val = param.LinearValue();
-    auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});
+    auto const display_string =
+        param.info.LinearValueToString(val, ShowCutoffInSemitones(g.prefs)).ReleaseValueOr({});
     Optional<f32> new_val {};
     Optional<imgui::TextInputResult> param_text_input_result {};
 
@@ -821,7 +827,8 @@ Box DoKnobParameter(GuiState& g,
             container.is_hot = g.imgui.IsHot(container.imgui_id);
 
             if (dragger_result.new_string_value) {
-                if (auto v = param.info.StringToLinearValue(*dragger_result.new_string_value)) {
+                if (auto v = param.info.StringToLinearValue(*dragger_result.new_string_value,
+                                                            ShowCutoffInSemitones(g.prefs))) {
                     new_val = v;
                     GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::ImmediatelyUpdate);
                 }
@@ -966,7 +973,7 @@ Box DoVerticalSliderParameter(GuiState& g,
                   },
                   .value_popup = options.is_fake ? TooltipString {k_nullopt}
                                                  : TooltipString {FunctionRef<String()> {[&]() -> String {
-                                                       return ParamValuePopupText(param, g.builder.arena);
+                                                       return ParamValuePopupText(g, param, g.builder.arena);
                                                    }}},
                   .tooltip = FunctionRef<String()> {[&]() -> String {
                       if (options.override_tooltip.size) return options.override_tooltip;
@@ -976,7 +983,8 @@ Box DoVerticalSliderParameter(GuiState& g,
               });
 
     auto val = param.LinearValue();
-    auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});
+    auto const display_string =
+        param.info.LinearValueToString(val, ShowCutoffInSemitones(g.prefs)).ReleaseValueOr({});
     Optional<f32> new_val {};
     Optional<imgui::TextInputResult> param_text_input_result {};
 
@@ -1014,7 +1022,8 @@ Box DoVerticalSliderParameter(GuiState& g,
             container.is_hot = g.imgui.IsHot(container.imgui_id);
 
             if (dragger_result.new_string_value) {
-                if (auto v = param.info.StringToLinearValue(*dragger_result.new_string_value)) {
+                if (auto v = param.info.StringToLinearValue(*dragger_result.new_string_value,
+                                                            ShowCutoffInSemitones(g.prefs))) {
                     new_val = v;
                     GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::ImmediatelyUpdate);
                 }
@@ -1582,7 +1591,9 @@ void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const
         for (auto const p : params) {
             if (p == g.param_text_editor_to_open->param) {
                 auto const p_obj = g.engine.processor.main_params.DescribedValue(p);
-                auto const str = p_obj.info.LinearValueToString(p_obj.LinearValue());
+                auto const show_cutoff_in_semitones = ShowCutoffInSemitones(g.prefs);
+                auto const str =
+                    p_obj.info.LinearValueToString(p_obj.LinearValue(), show_cutoff_in_semitones);
                 ASSERT(str.HasValue());
 
                 g.imgui.SetTextInputFocus(id, *str, false);
@@ -1601,7 +1612,8 @@ void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const
                 });
 
                 if (text_input.enter_pressed || g.imgui.TextInputJustUnfocused(id)) {
-                    if (auto val = p_obj.info.StringToLinearValue(text_input.text)) {
+                    if (auto val =
+                            p_obj.info.StringToLinearValue(text_input.text, show_cutoff_in_semitones)) {
                         SetParameterValue(g.engine.processor, p, *val, {});
                         GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::ImmediatelyUpdate);
                     }
@@ -1629,14 +1641,16 @@ void ParameterTooltip(GuiState& g,
                       Rect window_r,
                       Optional<Rect> avoid_r,
                       String tooltip_footer,
-                      String tooltip_note) {
+                      String tooltip_note,
+                      Optional<f32> value_popup_fixed_width) {
     Tooltip(g,
             imgui_id,
             window_r,
             {
                 .value_popup = FunctionRef<String()> {[&]() -> String {
-                    return ParamValuePopupText(params, g.scratch_arena);
+                    return ParamValuePopupText(g, params, g.scratch_arena);
                 }},
+                .value_popup_fixed_width = value_popup_fixed_width,
                 .tooltip = FunctionRef<String()> {[&]() -> String {
                     if (params.size == 1 && !tooltip_note.size)
                         return ParamTooltipText(*params[0], g.scratch_arena);

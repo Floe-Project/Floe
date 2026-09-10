@@ -8,6 +8,7 @@
 
 #include "engine/engine.hpp"
 #include "gui/controls/gui_filter_graph_draw.hpp"
+#include "gui/core/gui_prefs.hpp"
 #include "gui/core/gui_state.hpp"
 #include "gui/elements/gui_param_elements.hpp"
 #include "gui/elements/gui_popup_menu.hpp"
@@ -170,13 +171,18 @@ struct GrabberDrawOptions {
 };
 
 static void DrawGrabberHandleAndPopup(GuiState& g, GrabberDrawOptions const& opt) {
+    // Note names vary in length as you drag (sharps make them longer), which otherwise makes the popup
+    // resize/jump every frame. Hz/kHz display doesn't have this problem, so only fix the width when note
+    // names are shown.
+    Optional<f32> const popup_fixed_width = ShowCutoffInSemitones(g.prefs) ? Optional<f32> {150.0f} : k_nullopt;
     ParameterTooltip(g,
                      opt.popup_params,
                      opt.interaction_id,
                      opt.grabber_window_r,
                      g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r),
                      GrabberTooltipFooter(g.scratch_arena, opt.interactions),
-                     "Vertical lines: 100 Hz, 1 kHz, 10 kHz\nHorizontal lines: every 6 dB"_s);
+                     "Vertical lines: 100 Hz, 1 kHz, 10 kHz\nHorizontal lines: every 6 dB"_s,
+                     popup_fixed_width);
     filter_graph_draw::DrawHandle(g.imgui,
                                   g.imgui.ViewportPosToWindowPos(opt.node_pos_viewport),
                                   opt.handle_radius,

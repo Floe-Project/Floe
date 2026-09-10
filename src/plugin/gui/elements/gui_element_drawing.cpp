@@ -852,16 +852,22 @@ struct TooltipText {
 
 static f32 TooltipFooterGap(Fonts& fonts) { return fonts.Current()->font_size; }
 
-static f32x2
-TooltipBoxSize(Fonts& fonts, FontType font, TooltipText const& str, f32 max_text_width, f32x2 text_margin) {
+static f32x2 TooltipBoxSize(Fonts& fonts,
+                            FontType font,
+                            TooltipText const& str,
+                            f32 max_text_width,
+                            f32x2 text_margin,
+                            Optional<f32> fixed_text_width = k_nullopt) {
     fonts.Push(ToInt(font));
     DEFER { fonts.Pop(); };
-    auto size = fonts.CalcTextSize(str.text, {.wrap_width = max_text_width});
+    auto const wrap_width = fixed_text_width.ValueOr(max_text_width);
+    auto size = fonts.CalcTextSize(str.text, {.wrap_width = wrap_width});
     if (str.footer.size) {
-        auto const footer_size = fonts.CalcTextSize(str.footer, {.wrap_width = max_text_width});
+        auto const footer_size = fonts.CalcTextSize(str.footer, {.wrap_width = wrap_width});
         size = {Max(size.x, footer_size.x), size.y + TooltipFooterGap(fonts) + footer_size.y};
     }
-    return f32x2 {Min(max_text_width, size.x), size.y} + (text_margin * 2);
+    auto const text_width = fixed_text_width.ValueOr(Min(max_text_width, size.x));
+    return f32x2 {text_width, size.y} + (text_margin * 2);
 }
 
 static void DrawTooltipBox(imgui::Context const& imgui,
@@ -935,8 +941,9 @@ static Rect PlaceTooltipBesideElement(TooltipPlacementContext const& ctx,
                                       Fonts& fonts,
                                       FontType font,
                                       TooltipText const& str,
-                                      TooltipPlacement placement) {
-    auto const min_text_width = WwToPixels(k_tooltip_min_width);
+                                      TooltipPlacement placement,
+                                      Optional<f32> fixed_text_width = k_nullopt) {
+    auto const min_text_width = fixed_text_width.ValueOr(WwToPixels(k_tooltip_min_width));
     auto const clamp_x = [&](Rect r) {
         r.x = Clamp(r.x, 0.0f, Max(0.0f, ctx.window_size.x - r.w));
         return r;
@@ -947,10 +954,11 @@ static Rect PlaceTooltipBesideElement(TooltipPlacementContext const& ctx,
     };
 
     for (auto const side : TooltipSideOrder(placement)) {
-        auto const text_width = TooltipTextWidthOnSide(ctx, side);
-        if (text_width < min_text_width) continue;
+        auto const available_width = TooltipTextWidthOnSide(ctx, side);
+        if (available_width < min_text_width) continue;
+        auto const text_width = fixed_text_width.ValueOr(available_width);
 
-        Rect r {.size = TooltipBoxSize(fonts, font, str, text_width, ctx.text_margin)};
+        Rect r {.size = TooltipBoxSize(fonts, font, str, text_width, ctx.text_margin, fixed_text_width)};
         switch (side) {
             case TooltipSide::Below:
                 r.pos = {ctx.element_r.CentreX() - (r.w / 2), ctx.avoid_r.Bottom()};
@@ -972,7 +980,12 @@ static Rect PlaceTooltipBesideElement(TooltipPlacementContext const& ctx,
     }
 
     Rect r {.pos = ctx.element_r.pos,
-            .size = TooltipBoxSize(fonts, font, str, WwToPixels(k_tooltip_max_width), ctx.text_margin)};
+            .size = TooltipBoxSize(fonts,
+                                   font,
+                                   str,
+                                   WwToPixels(k_tooltip_max_width),
+                                   ctx.text_margin,
+                                   fixed_text_width)};
     return clamp_y(clamp_x(r));
 }
 
@@ -990,7 +1003,14 @@ void DrawOverlayTooltipForRect(imgui::Context const& imgui, Fonts& fonts, DrawTo
     Optional<Rect> value_popup_r {};
     if (args.value_popup_opacity > 0) {
         TooltipText const value_popup {.text = args.value_popup};
-        value_popup_r = PlaceTooltipBesideElement(ctx, fonts, FontType::Body, value_popup, args.placement);
+        auto const fixed_text_width_px =
+            args.value_popup_fixed_width.Transform([&](f32 w) { return WwToPixels(w); });
+        value_popup_r = PlaceTooltipBesideElement(ctx,
+                                                  fonts,
+                                                  FontType::Body,
+                                                  value_popup,
+                                                  args.placement,
+                                                  fixed_text_width_px);
         DrawTooltipBox(imgui,
                        fonts,
                        FontType::Body,

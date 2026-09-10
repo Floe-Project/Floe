@@ -1086,7 +1086,7 @@ static void DoEqPage(GuiState& g, u8 layer_index, Box parent) {
                         label_and_menu,
                         params.DescribedValue(layer_index, type_param),
                         {
-                            .width = 110,
+                            .width = 135,
                             .greyed_out = greyed_out,
                             .label = false,
                         });

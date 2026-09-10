@@ -2561,9 +2561,9 @@ Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, 
     SetHot(rect_in_window_coords, id);
     RegisterRectForMouseTracking(rect_in_window_coords);
 
-    constexpr auto k_delay_secs = 0.5;
+    constexpr auto k_delay_secs = 1.5;
     constexpr auto k_settle_secs = 0.08; // Stops rapid flicker when sweeping the cursor across many items.
-    constexpr auto k_fade_secs = 0.1;
+    constexpr auto k_fade_secs = 0.2;
 
     if (WasJustMadeHot(id)) {
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_settle_secs);

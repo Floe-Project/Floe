@@ -3247,7 +3247,7 @@ consteval auto CreateParams() {
     mp(LimiterOn) = Args {
         .id = id(IdRegion::Master, 140), // never change
         .id_string = "fx.limiter.on"_s,
-        .added_in_generation = 4,
+        .added_in_generation = 6,
         .value_config = val_config_helpers::Bool({.default_state = false}),
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "On"_s,
@@ -3257,7 +3257,7 @@ consteval auto CreateParams() {
     mp(LimiterMix) = Args {
         .id = id(IdRegion::Master, 141), // never change
         .id_string = "fx.limiter.mix"_s,
-        .added_in_generation = 4,
+        .added_in_generation = 6,
         .value_config = val_config_helpers::Percent({.default_percent = 100}),
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "Mix"_s,
@@ -3267,7 +3267,7 @@ consteval auto CreateParams() {
     mp(LimiterGain) = Args {
         .id = id(IdRegion::Master, 142), // never change
         .id_string = "fx.limiter.gain"_s,
-        .added_in_generation = 4,
+        .added_in_generation = 6,
         .value_config = val_config_helpers::Gain({.default_db = 0}),
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "Gain"_s,
@@ -3277,7 +3277,7 @@ consteval auto CreateParams() {
     mp(LimiterCeiling) = Args {
         .id = id(IdRegion::Master, 143), // never change
         .id_string = "fx.limiter.ceiling"_s,
-        .added_in_generation = 4,
+        .added_in_generation = 6,
         .value_config =
             ParamDescriptor::ConstructorArgs::ValueConfig {
                 .linear_range = {-12, 0},

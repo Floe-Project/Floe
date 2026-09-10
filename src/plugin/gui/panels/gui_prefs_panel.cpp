@@ -18,6 +18,8 @@
 #include "gui_framework/app_window_sizes.hpp"
 #include "gui_framework/font_type.hpp"
 #include "gui_framework/gui_builder.hpp"
+#include "gui_framework/gui_frame.hpp"
+#include "gui_framework/layout.hpp"
 #include "plugin/plugin.hpp"
 
 static void
@@ -118,9 +120,12 @@ static FolderSelectorResult PreferencesFolderSelector(GuiBuilder& builder,
           {
               .parent = path_container,
               .text = display_path,
-              .size_from_text = true,
               .font = FontType::Body,
-              .tooltip = display_path.data == path.data ? TooltipString(k_nullopt) : path,
+              .text_overflow = TextOverflowType::ShowDotsOnRight,
+              .layout {
+                  .size = {layout::k_fill_parent, k_font_body_size},
+              },
+              .value_popup = display_path.data == path.data ? TooltipString(k_nullopt) : path,
           });
     auto const icon_button_container = DoBox(builder,
                                              {

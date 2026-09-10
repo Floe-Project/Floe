@@ -635,10 +635,22 @@ TEST_CASE(TestDryDelayMatchesWetLatency) {
     dsp.SetSettings({.type = DistortionType::LegacyClip, .compensate = false});
     dsp.SetSampleRate(RenderedSine::k_sample_rate);
 
+    // Same ring-buffer scheme the distortion effect uses to align its dry signal.
+    constexpr u32 k_delay_size = NextPowerOf2(DistortionDsp::k_latency_base_samples + 1);
+    Array<f32, k_delay_size> delay_buffer {};
+    u32 delay_pos = 0;
+    auto const delay_dry = [&](f32 in) {
+        delay_buffer[delay_pos & (k_delay_size - 1)] = in;
+        auto const delayed =
+            delay_buffer[(delay_pos - DistortionDsp::k_latency_base_samples) & (k_delay_size - 1)];
+        ++delay_pos;
+        return delayed;
+    };
+
     Array<f32, 64> impulse_response {};
     for (auto const n : Range(64u)) {
         auto const in = n == 0 ? 0.5f : 0.0f;
-        auto const dry = dsp.DelayDry(f32x2(in)).x;
+        auto const dry = delay_dry(in);
         impulse_response[n] = dsp.Process(f32x2(in), {.drive01 = 0}).x;
         CHECK_EQ(dry, n == DistortionDsp::k_latency_base_samples ? 0.5f : 0.0f);
     }
@@ -648,6 +660,8 @@ TEST_CASE(TestDryDelayMatchesWetLatency) {
     CHECK_EQ(peak_index, (usize)DistortionDsp::k_latency_base_samples);
 
     dsp.Reset();
+    delay_buffer = {};
+    delay_pos = 0;
     f32 phase = 0;
     f64 mix_sum_sq = 0;
     f64 in_sum_sq = 0;
@@ -655,7 +669,7 @@ TEST_CASE(TestDryDelayMatchesWetLatency) {
         auto const in = 0.25f * Sin(phase);
         phase += k_tau<> * 10000 / RenderedSine::k_sample_rate;
         if (phase > k_tau<>) phase -= k_tau<>;
-        auto const dry = dsp.DelayDry(f32x2(in)).x;
+        auto const dry = delay_dry(in);
         auto const wet = dsp.Process(f32x2(in), {.drive01 = 0}).x;
         if (n >= RenderedSine::k_warmup) {
             auto const mixed = (0.5f * dry) + (0.5f * wet);

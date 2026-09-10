@@ -554,17 +554,6 @@ struct DistortionDsp {
         high_shelf_data = {};
         low_shelf_coeffs.ResetSmoothing();
         high_shelf_coeffs.ResetSmoothing();
-        for (auto& d : dry_delay)
-            d = 0;
-        dry_delay_pos = 0;
-    }
-
-    // Returns the input delayed by k_latency_base_samples so it lines up with Process()'s output.
-    f32x2 DelayDry(f32x2 input) {
-        dry_delay[dry_delay_pos & k_dry_delay_mask] = input;
-        auto const delayed = dry_delay[(dry_delay_pos - k_latency_base_samples) & k_dry_delay_mask];
-        ++dry_delay_pos;
-        return delayed;
     }
 
     struct PunishStages {
@@ -746,9 +735,6 @@ struct DistortionDsp {
         return output_dc_blocker.HighPass(wet, dc_block_cutoff_base);
     }
 
-    static constexpr u32 k_dry_delay_size = NextPowerOf2(k_latency_base_samples + 1);
-    static constexpr u32 k_dry_delay_mask = k_dry_delay_size - 1;
-
     Settings settings {};
     DistortionNormTable const* norm_table = &k_distortion_norm_table;
     f32 sample_rate = 44100;
@@ -774,7 +760,4 @@ struct DistortionDsp {
     rbj_filter::SmoothedCoefficients high_shelf_coeffs {};
     rbj_filter::StereoData low_shelf_data {};
     rbj_filter::StereoData high_shelf_data {};
-
-    Array<f32x2, k_dry_delay_size> dry_delay {};
-    u32 dry_delay_pos = 0;
 };

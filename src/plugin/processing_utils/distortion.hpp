@@ -74,7 +74,7 @@ struct DiodeCurve {
         auto const u_high = Max(u, f32x2(1));
 
         // Natural log for large inputs
-        auto const log_u = Log(u_high);
+        auto const log_u = LogFast(u_high);
 
         // Polynomial approximation for middle inputs
         auto const cubic = ((((0.0026677352f * u) - 0.061137704f) * u + 0.61860213f) * u) - 0.58201244f;
@@ -84,7 +84,7 @@ struct DiodeCurve {
 
         // Two iterations of Newton-Raphson
         for (auto _ : Range(2)) {
-            auto const exp_v = Exp(v);
+            auto const exp_v = ExpFast(v);
             v -= (exp_v + v - u) / (exp_v + 1);
         }
 
@@ -146,6 +146,7 @@ struct SineFoldCurve {
 
     static f32x2 IntegralDiff(f32x2 a, f32x2 b) {
         // cos(b) - cos(a), written as a product of sines.
+        // Sin() is actually faster here than SinFast() in our benchmarks.
         return 2 * Sin((a + b) * 0.5f) * Sin((a - b) * 0.5f);
     }
 };
@@ -179,7 +180,7 @@ static inline f32x2 Sinc(f32x2 x) {
     auto const initial_x = x;
     x = x == 0.0f ? 1.0f : x;
     x *= k_pi<>;
-    return initial_x == 0.0f ? f32x2(1) : Sin(x) / x;
+    return initial_x == 0.0f ? f32x2(1) : SinFast(x) / x;
 }
 
 struct DriveRangeDb {
@@ -264,8 +265,8 @@ struct DistortionShaper {
             }
             case DistortionType::Warp:
             case DistortionType::LegacyRaph1: {
-                output = (input < 0) ? (Exp(input) - 1.0f - Sinc(3.0f + input))
-                                     : (1.0f - Exp(-input) + Sinc(input - 3.0f));
+                output = (input < 0) ? (ExpFast(input) - 1.0f - Sinc(3.0f + input))
+                                     : (1.0f - ExpFast(-input) + Sinc(input - 3.0f));
                 break;
             }
             case DistortionType::Octave: {

@@ -815,9 +815,6 @@ void Context::BeginFrame(ViewportConfig cfg, Fonts& fonts) {
     } else {
         time_when_turned_hot = TimePoint {};
     }
-    if (immediate_tooltip_item != k_null_id && hot_item != immediate_tooltip_item &&
-        active_item.id != immediate_tooltip_item && active_item_last_frame.id != immediate_tooltip_item)
-        immediate_tooltip_item = k_null_id;
     keyboard_focus_item = temp_keyboard_focus_item;
     temp_keyboard_focus_item = k_null_id;
     temp_keyboard_focus_item_is_popup = false;
@@ -2551,10 +2548,46 @@ Context::DraggerResult Context::DraggerBehaviour(DraggerBehaviourArgs const& arg
     return result;
 }
 
-static f32 TooltipFadeIn(f64 seconds_visible, f64 fade_secs) {
-    auto const fade = (f32)Clamp(seconds_visible / fade_secs, 0.0, 1.0);
-    if (fade < 1) GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
-    return 1 - ((1 - fade) * (1 - fade));
+// Fades in when show becomes true, fades out from the current opacity when it becomes false. Returns 0 for
+// any id other than the one the state is tracking.
+static f32 TooltipFadeOpacity(Context::TooltipFadeState& state, Id id, bool show) {
+    constexpr auto k_fade_in_secs = 0.2;
+    constexpr auto k_fade_out_secs = 0.1;
+    auto const now = GuiIo().in.current_time;
+
+    auto const fade_in_opacity = [&]() {
+        auto const fade = (f32)Clamp((now - state.time_shown) / k_fade_in_secs, 0.0, 1.0);
+        return 1 - ((1 - fade) * (1 - fade));
+    };
+    auto const fade_out_opacity = [&]() {
+        auto const fade = (f32)Clamp((now - state.time_hidden) / k_fade_out_secs, 0.0, 1.0);
+        return state.opacity_when_hidden * (1 - fade);
+    };
+
+    if (state.item == id && state.time_hidden && now - state.time_hidden >= k_fade_out_secs) state = {};
+
+    if (show) {
+        if (state.item != id) {
+            state = {.item = id, .time_shown = now};
+        } else if (state.time_hidden) {
+            // Re-shown mid fade-out: resume the fade-in from the current opacity rather than from 0.
+            auto const seconds_into_fade_in = k_fade_in_secs * (1 - (f64)Sqrt(1 - fade_out_opacity()));
+            state.time_shown = now + -seconds_into_fade_in;
+            state.time_hidden = {};
+        }
+        auto const opacity = fade_in_opacity();
+        if (opacity < 1) GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+        return opacity;
+    }
+
+    if (state.item != id) return 0;
+
+    if (!state.time_hidden) {
+        state.time_hidden = now;
+        state.opacity_when_hidden = fade_in_opacity();
+    }
+    GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+    return fade_out_opacity();
 }
 
 Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, imgui::Id id) {
@@ -2563,36 +2596,23 @@ Context::TooltipOpacities Context::TooltipBehaviour(Rect rect_in_window_coords, 
 
     constexpr auto k_delay_secs = 1.5;
     constexpr auto k_settle_secs = 0.08; // Stops rapid flicker when sweeping the cursor across many items.
-    constexpr auto k_fade_secs = 0.2;
 
     if (WasJustMadeHot(id)) {
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_settle_secs);
         GuiIo().out.SetTimedWakeup(SourceLocationHash(), GuiIo().in.current_time + k_delay_secs);
     }
 
-    TooltipOpacities result {};
-
     // WasJustDeactivated bridges the frame between releasing a drag and becoming hot again. An item can't
     // be hot while it's active, so a released drag restarts the hot timer: skip the settle delay if the
     // popup is already showing for this item, else it'd blink off for the settle duration.
     auto const settled_hot =
-        IsHot(id) && (SecondsSpentHot() >= k_settle_secs || immediate_tooltip_item == id);
-    if (settled_hot || IsActive(id) || WasJustDeactivated(id)) {
-        if (immediate_tooltip_item != id) {
-            immediate_tooltip_item = id;
-            time_immediate_tooltip_started = GuiIo().in.current_time;
-        }
-        result.immediate =
-            TooltipFadeIn(GuiIo().in.current_time - time_immediate_tooltip_started, k_fade_secs);
-    }
+        IsHot(id) && (SecondsSpentHot() >= k_settle_secs || immediate_tooltip.item == id);
 
-    if (!IsHot(id)) return result;
-
-    auto const seconds_visible = SecondsSpentHot() - k_delay_secs;
-    if (seconds_visible < 0) return result;
-
-    result.delayed = TooltipFadeIn(seconds_visible, k_fade_secs);
-    return result;
+    return {
+        .immediate =
+            TooltipFadeOpacity(immediate_tooltip, id, settled_hot || IsActive(id) || WasJustDeactivated(id)),
+        .delayed = TooltipFadeOpacity(delayed_tooltip, id, IsHot(id) && SecondsSpentHot() >= k_delay_secs),
+    };
 }
 
 } // namespace imgui

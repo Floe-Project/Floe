@@ -50,7 +50,7 @@ Box MenuItem(GuiBuilder& builder,
 
 struct MenuSubmenuItemOptions {
     String text;
-    bool is_selected; // Shows the check icon, e.g. when the current value lives inside this submenu.
+    bool is_selected; // Marks the category with a dot, e.g. when the current value lives inside this submenu.
     TrivialFunctionRef<void(Box submenu_root)> do_submenu_items;
 };
 

@@ -1933,8 +1933,9 @@ void Context::BeginViewport(ViewportConfig const& cfg, Viewport* viewport, Rect 
                 rect_to_avoid = curr_viewport->bounds;
                 rect_to_avoid.y = 0;
                 rect_to_avoid.h = FLT_MAX;
-                rect_to_avoid.x += 5;
-                rect_to_avoid.w -= 10;
+                auto const overlap = WwToPixels(1.5f);
+                rect_to_avoid.x += overlap;
+                rect_to_avoid.w -= overlap * 2;
 
                 base_r.y -= viewport->cfg.padding.t;
             }

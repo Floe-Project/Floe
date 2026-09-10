@@ -6,6 +6,7 @@
 #include "gui/core/gui_state.hpp"
 #include "gui/elements/gui_constants.hpp"
 #include "gui/elements/gui_modal.hpp"
+#include "gui_framework/font_type.hpp"
 
 Box MenuOpenButton(GuiBuilder& builder, Box parent, MenuOpenButtonOptions const& options, u64 id_extra) {
     auto const background_colours = [&]() -> Colours {
@@ -159,12 +160,16 @@ Box MenuSubmenuItem(GuiBuilder& builder, Box parent, MenuSubmenuItemOptions cons
                                 .button_behaviour = imgui::ButtonConfig {},
                             });
 
+    // The submenu is 'selected' when it contains the currently-active item. This is a different meaning to a
+    // MenuItem's checkmark, so we mark the category with a subtle dot rather than a tick.
     DoBox(builder,
           {
               .parent = item,
-              .text = options.is_selected ? String(ICON_FA_CHECK) : "",
+              .text = options.is_selected ? String(ICON_FA_CIRCLE) : "",
               .font = FontType::Icons,
+              .font_size = k_font_body_size * 0.3f,
               .text_colours = Col {.c = Col::Subtext0},
+              .text_justification = TextJustification::Centred,
               .layout {
                   .size = k_icon_button_size,
                   .margins {.l = k_menu_item_padding_x},
@@ -197,7 +202,9 @@ Box MenuSubmenuItem(GuiBuilder& builder, Box parent, MenuSubmenuItemOptions cons
               .text = ICON_FA_CARET_RIGHT,
               .size_from_text = true,
               .font = FontType::Icons,
+              .font_size = k_font_body_size * 0.7f,
               .text_colours = Col {.c = Col::Subtext0},
+              .layout {.margins = {.l = 20}},
           });
 
     if (auto const item_r = BoxRect(builder, item)) {

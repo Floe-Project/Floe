@@ -29,6 +29,12 @@ static Rect MakeGrabberWindowRect(imgui::Context& imgui, f32x2 node_pos_viewport
     return imgui.RegisterAndConvertRect(viewport_r);
 }
 
+enum class GrabberYDrag : u8 {
+    None,
+    Node, // The node follows the cursor: y_t is the position in the graph, 1 at the top.
+    Offset, // The node stays where it is: y_t is y_offset_base shifted by the drag distance.
+};
+
 struct GrabberDragOptions {
     Rect viewport_r;
     Rect grabber_window_r;
@@ -36,13 +42,16 @@ struct GrabberDragOptions {
     f32x2 node_pos_viewport;
     Span<ParamIndex const> moving_params;
     ParamIndex double_click_target;
-    bool track_y_axis;
+    GrabberYDrag y_drag;
+    f32 y_offset_base; // GrabberYDrag::Offset: linear value that up/down drag moves away from.
     TrivialFunctionRef<void(f32 x_t, f32 y_t)> on_drag;
     String drag_name;
 };
 
-// One global suffices: only one grabber can be dragged at a time.
+// One of each suffices: only one grabber can be dragged at a time.
 static f32x2 g_grabber_rel_click_pos;
+static f32 g_grabber_y_at_click;
+static f32 g_grabber_y_base_at_click;
 
 static void RunGrabberDrag(GuiState& g, GrabberDragOptions const& opt) {
     auto& imgui = g.imgui;
@@ -50,13 +59,19 @@ static void RunGrabberDrag(GuiState& g, GrabberDragOptions const& opt) {
 
     if (imgui.ButtonBehaviour(opt.grabber_window_r,
                               opt.interaction_id,
-                              imgui::SliderConfig::k_activation_cfg))
+                              imgui::SliderConfig::k_activation_cfg)) {
         g_grabber_rel_click_pos = GuiIo().in.cursor_pos - imgui.ViewportPosToWindowPos(opt.node_pos_viewport);
+        g_grabber_y_at_click = GuiIo().in.cursor_pos.y;
+        g_grabber_y_base_at_click = opt.y_offset_base;
+    }
 
     if (imgui.ButtonBehaviour(opt.grabber_window_r,
                               opt.interaction_id,
                               {.mouse_button = MouseButton::Left, .event = MouseButtonEvent::DoubleClick}))
-        g.param_text_editor_to_open = opt.double_click_target;
+        g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {
+            .param = opt.double_click_target,
+            .widget_id = ParamTextEditorOverlayId(imgui),
+        };
 
     if (imgui.WasJustActivated(opt.interaction_id, MouseButton::Left)) {
         BeginUndoableStep(g.engine, opt.drag_name);
@@ -71,10 +86,21 @@ static void RunGrabberDrag(GuiState& g, GrabberDragOptions const& opt) {
         auto const x_t = MapTo01(Clamp(cursor.x, min_x, max_x), min_x, max_x);
 
         f32 y_t = 0;
-        if (opt.track_y_axis) {
-            auto const min_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.y}).y;
-            auto const max_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.Bottom()}).y;
-            y_t = 1.0f - MapTo01(Clamp(cursor.y, min_y, max_y), min_y, max_y);
+        switch (opt.y_drag) {
+            case GrabberYDrag::None: break;
+            case GrabberYDrag::Node: {
+                auto const min_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.y}).y;
+                auto const max_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.Bottom()}).y;
+                y_t = 1.0f - MapTo01(Clamp(cursor.y, min_y, max_y), min_y, max_y);
+                break;
+            }
+            case GrabberYDrag::Offset: {
+                auto const min_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.y}).y;
+                auto const max_y = imgui.ViewportPosToWindowPos({0, opt.viewport_r.Bottom()}).y;
+                auto const drag_distance = GuiIo().in.cursor_pos.y - g_grabber_y_at_click;
+                y_t = Clamp01(g_grabber_y_base_at_click - (drag_distance / (max_y - min_y)));
+                break;
+            }
         }
         opt.on_drag(x_t, y_t);
     }
@@ -99,6 +125,38 @@ static void DoScrollResonance(GuiState& g,
     SetParameterValue(g.engine.processor, reso_index, new_reso, {});
 }
 
+// What a node responds to. Nodes differ: some only move horizontally, some also take the wheel, and for
+// the effect filter and EQ it depends on the type currently selected. Double-click always types the
+// horizontal parameter.
+struct GrabberInteractions {
+    DescribedParamValue const& horizontal_drag;
+    DescribedParamValue const* vertical_drag = nullptr; // Nullptr if the node only moves horizontally.
+    DescribedParamValue const* scroll = nullptr; // Nullptr if the wheel does nothing.
+};
+
+static String GrabberTooltipFooter(ArenaAllocator& arena, GrabberInteractions const& interactions) {
+    DynamicArray<char> buf {arena};
+
+    fmt::Append(buf, "Drag left/right for {}", interactions.horizontal_drag.info.name);
+    if (interactions.vertical_drag)
+        fmt::Append(buf, ", up/down for {}", interactions.vertical_drag->info.name);
+    dyn::AppendSpan(buf, ". "_s);
+
+    auto const scroll_is_separate_param =
+        interactions.scroll && (!interactions.vertical_drag ||
+                                interactions.scroll->info.index != interactions.vertical_drag->info.index);
+    if (scroll_is_separate_param) fmt::Append(buf, "Scroll for {}. ", interactions.scroll->info.name);
+
+    if (interactions.vertical_drag || interactions.scroll)
+        fmt::Append(buf, "Double-click to type a {} value. ", interactions.horizontal_drag.info.name);
+    else
+        dyn::AppendSpan(buf, "Double-click to type. "_s);
+
+    dyn::AppendSpan(buf, "Right-click for more options."_s);
+
+    return buf.ToOwnedSpan();
+}
+
 struct GrabberDrawOptions {
     f32x2 node_pos_viewport;
     f32 handle_radius;
@@ -106,6 +164,7 @@ struct GrabberDrawOptions {
     Rect grabber_window_r;
     Rect graph_viewport_r; // The popup is placed outside of this.
     Span<DescribedParamValue const*> popup_params;
+    GrabberInteractions interactions;
     bool greyed_out;
     CursorType active_cursor;
 };
@@ -116,7 +175,8 @@ static void DrawGrabberHandleAndPopup(GuiState& g, GrabberDrawOptions const& opt
                      opt.interaction_id,
                      opt.grabber_window_r,
                      g.imgui.ViewportRectToWindowRect(opt.graph_viewport_r),
-                     "Double-click to type. Right-click for more options."_s);
+                     GrabberTooltipFooter(g.scratch_arena, opt.interactions),
+                     "Vertical lines: 100 Hz, 1 kHz, 10 kHz\nHorizontal lines: every 6 dB"_s);
     filter_graph_draw::DrawHandle(g.imgui,
                                   g.imgui.ViewportPosToWindowPos(opt.node_pos_viewport),
                                   opt.handle_radius,
@@ -317,20 +377,24 @@ void DoFilterGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out
     auto const interaction_id = imgui.MakeId(SourceLocationHash());
     auto const grabber_window_r = MakeGrabberWindowRect(imgui, node_pos(), grabber_radius);
 
-    ParamIndex const moving[] = {cutoff_index};
-    RunGrabberDrag(
-        g,
-        {
-            .viewport_r = viewport_r,
-            .grabber_window_r = grabber_window_r,
-            .interaction_id = interaction_id,
-            .node_pos_viewport = node_pos(),
-            .moving_params = moving,
-            .double_click_target = cutoff_index,
-            .track_y_axis = false,
-            .on_drag = [&](f32 x_t, f32) { SetParameterValue(engine.processor, cutoff_index, x_t, {}); },
-            .drag_name = "Layer filter node"_s,
-        });
+    ParamIndex const moving[] = {cutoff_index, reso_index};
+    RunGrabberDrag(g,
+                   {
+                       .viewport_r = viewport_r,
+                       .grabber_window_r = grabber_window_r,
+                       .interaction_id = interaction_id,
+                       .node_pos_viewport = node_pos(),
+                       .moving_params = moving,
+                       .double_click_target = cutoff_index,
+                       .y_drag = GrabberYDrag::Offset,
+                       .y_offset_base = reso_param.LinearValue(),
+                       .on_drag =
+                           [&](f32 x_t, f32 y_t) {
+                               SetParameterValue(engine.processor, cutoff_index, x_t, {});
+                               SetParameterValue(engine.processor, reso_index, y_t, {});
+                           },
+                       .drag_name = "Layer filter node"_s,
+                   });
 
     DoScrollResonance(g, interaction_id, grabber_window_r, reso_index, reso_param.LinearValue());
 
@@ -373,8 +437,11 @@ void DoFilterGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out
                                   .grabber_window_r = grabber_window_r,
                                   .graph_viewport_r = viewport_r,
                                   .popup_params = popup_params,
+                                  .interactions = {.horizontal_drag = cutoff_param,
+                                                   .vertical_drag = &reso_param,
+                                                   .scroll = &reso_param},
                                   .greyed_out = greyed_out,
-                                  .active_cursor = CursorType::HorizontalArrows,
+                                  .active_cursor = CursorType::AllArrows,
                               });
 
     ParamIndex const editor_indices[] = {
@@ -501,7 +568,7 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
     auto const grabber_window_r = MakeGrabberWindowRect(imgui, node_pos(), grabber_radius);
 
     ParamIndex const moving_with_gain[] = {ParamIndex::FilterCutoff, ParamIndex::FilterGain};
-    ParamIndex const moving_no_gain[] = {ParamIndex::FilterCutoff};
+    ParamIndex const moving_no_gain[] = {ParamIndex::FilterCutoff, ParamIndex::FilterResonance};
     RunGrabberDrag(
         g,
         {
@@ -512,7 +579,8 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
             .moving_params = uses_gain ? Span<ParamIndex const> {moving_with_gain}
                                        : Span<ParamIndex const> {moving_no_gain},
             .double_click_target = ParamIndex::FilterCutoff,
-            .track_y_axis = uses_gain,
+            .y_drag = uses_gain ? GrabberYDrag::Node : GrabberYDrag::Offset,
+            .y_offset_base = reso_param.LinearValue(),
             .on_drag =
                 [&](f32 x_t, f32 y_t) {
                     SetParameterValue(engine.processor, ParamIndex::FilterCutoff, x_t, {});
@@ -522,6 +590,8 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                         auto const gain_linear =
                             gain_param.info.LineariseValue(new_gain_db, true).ValueOr(0.0f);
                         SetParameterValue(engine.processor, ParamIndex::FilterGain, gain_linear, {});
+                    } else {
+                        SetParameterValue(engine.processor, ParamIndex::FilterResonance, y_t, {});
                     }
                 },
             .drag_name = "Filter node"_s,
@@ -567,18 +637,20 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
         greyed_out);
 
     DescribedParamValue const* popup_params[] = {&cutoff_param, &reso_param, &gain_param};
-    DrawGrabberHandleAndPopup(
-        g,
-        {
-            .node_pos_viewport = node_pos(),
-            .handle_radius = handle_radius,
-            .interaction_id = interaction_id,
-            .grabber_window_r = grabber_window_r,
-            .graph_viewport_r = viewport_r,
-            .popup_params = popup_params,
-            .greyed_out = greyed_out,
-            .active_cursor = uses_gain ? CursorType::AllArrows : CursorType::HorizontalArrows,
-        });
+    DrawGrabberHandleAndPopup(g,
+                              {
+                                  .node_pos_viewport = node_pos(),
+                                  .handle_radius = handle_radius,
+                                  .interaction_id = interaction_id,
+                                  .grabber_window_r = grabber_window_r,
+                                  .graph_viewport_r = viewport_r,
+                                  .popup_params = popup_params,
+                                  .interactions = {.horizontal_drag = cutoff_param,
+                                                   .vertical_drag = uses_gain ? &gain_param : &reso_param,
+                                                   .scroll = &reso_param},
+                                  .greyed_out = greyed_out,
+                                  .active_cursor = CursorType::AllArrows,
+                              });
 
     ParamIndex const editor_indices[] = {
         ParamIndex::FilterCutoff,
@@ -675,7 +747,7 @@ void DoReverbPreFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                            .node_pos_viewport = node_pos_for(gr),
                            .moving_params = moving,
                            .double_click_target = gr.index,
-                           .track_y_axis = false,
+                           .y_drag = GrabberYDrag::None,
                            .on_drag =
                                [&](f32 x_t, f32) {
                                    SetParameterValue(engine.processor,
@@ -709,6 +781,7 @@ void DoReverbPreFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                                       .grabber_window_r = gr.window_r,
                                       .graph_viewport_r = viewport_r,
                                       .popup_params = popup_params,
+                                      .interactions = {.horizontal_drag = gr.param},
                                       .greyed_out = greyed_out,
                                       .active_cursor = CursorType::HorizontalArrows,
                                   });
@@ -788,7 +861,7 @@ void DoReverbPostShelfGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                 .node_pos_viewport = node_pos_for(sh),
                 .moving_params = moving,
                 .double_click_target = sh.cutoff_idx,
-                .track_y_axis = true,
+                .y_drag = GrabberYDrag::Node,
                 .on_drag =
                     [&](f32 x_t, f32 y_t) {
                         SetParameterValue(engine.processor,
@@ -827,17 +900,19 @@ void DoReverbPostShelfGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     for (auto const& sh : shelves) {
         DescribedParamValue const* popup_params[] = {&sh.cutoff_param, &sh.gain_param};
-        DrawGrabberHandleAndPopup(g,
-                                  {
-                                      .node_pos_viewport = node_pos_for(sh),
-                                      .handle_radius = handle_radius,
-                                      .interaction_id = sh.interaction_id,
-                                      .grabber_window_r = sh.window_r,
-                                      .graph_viewport_r = viewport_r,
-                                      .popup_params = popup_params,
-                                      .greyed_out = greyed_out,
-                                      .active_cursor = CursorType::AllArrows,
-                                  });
+        DrawGrabberHandleAndPopup(
+            g,
+            {
+                .node_pos_viewport = node_pos_for(sh),
+                .handle_radius = handle_radius,
+                .interaction_id = sh.interaction_id,
+                .grabber_window_r = sh.window_r,
+                .graph_viewport_r = viewport_r,
+                .popup_params = popup_params,
+                .interactions = {.horizontal_drag = sh.cutoff_param, .vertical_drag = &sh.gain_param},
+                .greyed_out = greyed_out,
+                .active_cursor = CursorType::AllArrows,
+            });
         DoResetParamsRightClickMenu(g, sh.window_r, sh.interaction_id, Array {sh.cutoff_idx, sh.gain_idx});
     }
 
@@ -887,7 +962,7 @@ void DoConvolutionReverbHighpassGraph(GuiState& g, Rect viewport_r, bool greyed_
             .node_pos_viewport = node_pos(),
             .moving_params = moving,
             .double_click_target = ParamIndex::ConvolutionReverbHighpass,
-            .track_y_axis = false,
+            .y_drag = GrabberYDrag::None,
             .on_drag =
                 [&](f32 x_t, f32) {
                     SetParameterValue(engine.processor, ParamIndex::ConvolutionReverbHighpass, x_t, {});
@@ -925,6 +1000,7 @@ void DoConvolutionReverbHighpassGraph(GuiState& g, Rect viewport_r, bool greyed_
                                   .grabber_window_r = grabber_window_r,
                                   .graph_viewport_r = viewport_r,
                                   .popup_params = popup_params,
+                                  .interactions = {.horizontal_drag = cutoff_param},
                                   .greyed_out = greyed_out,
                                   .active_cursor = CursorType::HorizontalArrows,
                               });
@@ -982,7 +1058,7 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
                        .node_pos_viewport = node_pos(),
                        .moving_params = moving,
                        .double_click_target = ParamIndex::DelayFilterCutoffSemitones,
-                       .track_y_axis = true,
+                       .y_drag = GrabberYDrag::Node,
                        .on_drag =
                            [&](f32 x_t, f32 y_t) {
                                SetParameterValue(engine.processor,
@@ -1012,17 +1088,19 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
         greyed_out);
 
     DescribedParamValue const* popup_params[] = {&cutoff_param, &spread_param};
-    DrawGrabberHandleAndPopup(g,
-                              {
-                                  .node_pos_viewport = node_pos(),
-                                  .handle_radius = handle_radius,
-                                  .interaction_id = interaction_id,
-                                  .grabber_window_r = grabber_window_r,
-                                  .graph_viewport_r = viewport_r,
-                                  .popup_params = popup_params,
-                                  .greyed_out = greyed_out,
-                                  .active_cursor = CursorType::AllArrows,
-                              });
+    DrawGrabberHandleAndPopup(
+        g,
+        {
+            .node_pos_viewport = node_pos(),
+            .handle_radius = handle_radius,
+            .interaction_id = interaction_id,
+            .grabber_window_r = grabber_window_r,
+            .graph_viewport_r = viewport_r,
+            .popup_params = popup_params,
+            .interactions = {.horizontal_drag = cutoff_param, .vertical_drag = &spread_param},
+            .greyed_out = greyed_out,
+            .active_cursor = CursorType::AllArrows,
+        });
     DoResetParamsRightClickMenu(
         g,
         grabber_window_r,
@@ -1268,7 +1346,7 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
         auto const gain_param = params.DescribedValue(b.params.gain);
 
         ParamIndex const moving_with_gain[] = {b.params.freq, b.params.gain};
-        ParamIndex const moving_no_gain[] = {b.params.freq};
+        ParamIndex const moving_no_gain[] = {b.params.freq, b.params.reso};
         RunGrabberDrag(g,
                        {
                            .viewport_r = viewport_r,
@@ -1278,7 +1356,8 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
                            .moving_params = b.uses_gain ? Span<ParamIndex const> {moving_with_gain}
                                                         : Span<ParamIndex const> {moving_no_gain},
                            .double_click_target = b.params.freq,
-                           .track_y_axis = b.uses_gain,
+                           .y_drag = b.uses_gain ? GrabberYDrag::Node : GrabberYDrag::Offset,
+                           .y_offset_base = reso_param.LinearValue(),
                            .on_drag =
                                [&](f32 x_t, f32 y_t) {
                                    SetParameterValue(engine.processor, b.params.freq, x_t, {});
@@ -1289,6 +1368,8 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
                                        auto const gain_linear =
                                            gain_param.info.LineariseValue(new_gain_db, true).ValueOr(0.0f);
                                        SetParameterValue(engine.processor, b.params.gain, gain_linear, {});
+                                   } else {
+                                       SetParameterValue(engine.processor, b.params.reso, y_t, {});
                                    }
                                },
                            .drag_name = "EQ band node"_s,
@@ -1326,8 +1407,11 @@ DoEqGraphImpl(GuiState& g, Span<EqBandParams const> band_params, Rect viewport_r
                 .grabber_window_r = b.window_r,
                 .graph_viewport_r = viewport_r,
                 .popup_params = popup_params,
+                .interactions = {.horizontal_drag = freq_param,
+                                 .vertical_drag = b.uses_gain ? &gain_param : &reso_param,
+                                 .scroll = &reso_param},
                 .greyed_out = greyed_out,
-                .active_cursor = b.uses_gain ? CursorType::AllArrows : CursorType::HorizontalArrows,
+                .active_cursor = CursorType::AllArrows,
             });
         OverlayMacroDestinationRegion(g, b.window_r, b.params.freq);
     }

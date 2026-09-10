@@ -555,6 +555,16 @@ constexpr auto k_lfo_restart_mode_strings = ArrayT<String>({
     "Free",
 });
 static_assert(k_lfo_restart_mode_strings.size == ToInt(LfoRestartMode::Count));
+constexpr String LfoRestartModeDescription(LfoRestartMode mode) {
+    switch (mode) {
+        case LfoRestartMode::Retrigger:
+            return "Every note starts the LFO from the beginning of its cycle, so each note gets the same movement from the moment you play it."_s;
+        case LfoRestartMode::Free:
+            return "A new note joins in wherever this layer's sounding notes have reached in the cycle, so everything moves together. If nothing is sounding, the cycle starts fresh."_s;
+        case LfoRestartMode::Count: break;
+    }
+    return {};
+}
 
 enum class LegacyLfoDestination : u8 { // never reorder
     Volume,
@@ -587,6 +597,22 @@ constexpr auto k_lfo_destination_strings = ArrayT<String>({
     "Grain Position",
 });
 static_assert(k_lfo_destination_strings.size == ToInt(LfoDestination::Count));
+constexpr String LfoDestinationDescription(LfoDestination dest) {
+    switch (dest) {
+        case LfoDestination::Volume:
+            return "Wobbles the layer's level for a tremolo effect. The LFO only ever turns the layer down: at full Amount it dips between the layer's level and silence."_s;
+        case LfoDestination::Filter:
+            return "Sweeps the cutoff of the filter on the MAIN tab. At full Amount it moves the cutoff by up to half the knob's travel either way. The filter needs to be switched on to hear it."_s;
+        case LfoDestination::Pan:
+            return "Sweeps the layer from side to side around its Pan setting. At full Amount it reaches fully left and fully right."_s;
+        case LfoDestination::Pitch:
+            return "Bends the pitch up and down for vibrato. At full Amount it moves up to a semitone either way."_s;
+        case LfoDestination::GranularPosition:
+            return "Moves the point in the sample that grains are taken from, scanning up to half the sample either side of the Position setting. Only has an effect in Granular Fixed play mode, chosen on the PLAYBACK tab."_s;
+        case LfoDestination::Count: break;
+    }
+    return {};
+}
 
 enum class MpeDestination : u8 { // never reorder
     Off,
@@ -665,6 +691,34 @@ constexpr auto k_lfo_shape_strings = ArrayT<String>({
     "Trapezoid",
 });
 static_assert(k_lfo_shape_strings.size == ToInt(LfoShape::Count));
+constexpr String LfoShapeDescription(LfoShape shape) {
+    switch (shape) {
+        case LfoShape::Sine:
+            return "A smooth, even wave. The gentlest option, and the natural choice for vibrato and tremolo."_s;
+        case LfoShape::Triangle:
+            return "Rises and falls in straight lines at a steady speed. A little more insistent than a sine."_s;
+        case LfoShape::Sawtooth:
+            return "Ramps steadily down, then jumps back to the top and starts again. Set a negative Amount to flip it into a rising ramp."_s;
+        case LfoShape::Square:
+            return "Flicks between two extremes, spending half of each cycle at each. Abrupt, on-or-off movement."_s;
+        case LfoShape::RandomSteps:
+            return "Jumps to a new random value at the start of each cycle and holds it there, like a classic sample-and-hold. The random shapes run at twice the Time setting's rate."_s;
+        case LfoShape::RandomGlide:
+            return "Slides smoothly from one random value to the next, picking a new one each cycle. The random shapes run at twice the Time setting's rate."_s;
+        case LfoShape::Pluck:
+            return "Jumps to the top of each cycle and falls away like a plucked string: quickly at first, then easing off. Handy on Volume for a rhythmic, plucked feel."_s;
+        case LfoShape::PluckSharp:
+            return "Like Pluck, but with a much quicker fall for a snappier, more percussive attack."_s;
+        case LfoShape::PulseNarrow:
+            return "Sits at the top for a quarter of each cycle and at the bottom for the rest: a short, sharp blip."_s;
+        case LfoShape::PulseWide:
+            return "Sits at the top for three quarters of each cycle, with a brief dip to the bottom."_s;
+        case LfoShape::Trapezoid:
+            return "A square with the corners knocked off: it flicks between two extremes but takes a short ramp to get from one to the other, so it's smoother than Square."_s;
+        case LfoShape::Count: break;
+    }
+    return {};
+}
 
 enum class LegacyLayerFilterType : u8 { // never reorder
     Lowpass,
@@ -709,6 +763,26 @@ constexpr auto k_layer_filter_type_strings = ArrayT<String>({
     "Peak",
 });
 static_assert(k_layer_filter_type_strings.size == ToInt(LayerFilterType::Count));
+constexpr String LayerFilterTypeDescription(LayerFilterType type) {
+    switch (type) {
+        case LayerFilterType::Lowpass:
+            return "Cuts the frequencies above the cutoff, rolling off at 12 dB per octave. Resonance adds a peak at the cutoff."_s;
+        case LayerFilterType::Highpass:
+            return "Cuts the frequencies below the cutoff, rolling off at 12 dB per octave. Resonance adds a peak at the cutoff."_s;
+        case LayerFilterType::Bandpass:
+            return "Keeps only a band around the cutoff, rolling off at 6 dB per octave on each side. The band's level stays fixed; Resonance sets its width, with higher settings giving a narrower band."_s;
+        case LayerFilterType::BandpassResonant:
+            return "Like Band-pass, but the band's level rises with Resonance, reaching around 20 dB at maximum for a loud, whistling peak."_s;
+        case LayerFilterType::BandShelving:
+            return "Boosts a band around the cutoff by a fixed 9.5 dB, leaving everything else untouched. Resonance sets its width, with higher settings giving a narrower band."_s;
+        case LayerFilterType::Notch:
+            return "Cuts a band around the cutoff, leaving everything else untouched. Resonance sets its width, with higher settings giving a narrower notch."_s;
+        case LayerFilterType::Peak:
+            return "Boosts a band around the cutoff. Resonance sets the size of the boost, from nothing at 0% up to around 26 dB at maximum."_s;
+        case LayerFilterType::Count: break;
+    }
+    return {};
+}
 
 enum class LegacyEffectFilterType : u8 { // never reorder
     LowPass,
@@ -3268,7 +3342,7 @@ consteval auto CreateParams() {
             .name = "Mute"_s,
             .gui_label = "Mute"_s,
             .tooltip =
-                "Mute: silence this layer. Handy for hearing how the other layers sit together while you're designing a sound.\n\n"
+                "Mute silences this layer. Handy for hearing how the other layers sit together while you're designing a sound.\n\n"
                 "A muted layer keeps running in the background exactly as if you could hear it, so when you unmute, the sound carries on seamlessly from wherever it has naturally got to. If you're trying to save CPU, unload the Instrument instead.\n\n"
                 "If a layer is still audible after muting it, check whether it's also soloed: Solo takes priority over Mute."_s,
         };
@@ -3280,7 +3354,7 @@ consteval auto CreateParams() {
             .name = "Solo"_s,
             .gui_label = "Solo"_s,
             .tooltip =
-                "Solo: hear this layer on its own. Any layer that isn't soloed goes quiet. Handy for focusing on one part of a sound while you're designing it.\n\n"
+                "Solo lets you hear this layer on its own. Any layer that isn't soloed goes quiet. Handy for focusing on one part of a sound while you're designing it.\n\n"
                 "Silenced layers keep running in the background exactly as if you could hear them, so when you unsolo, they carry on seamlessly from wherever they have naturally got to. If you're trying to save CPU, unload their Instruments instead.\n\n"
                 "If a layer has gone quiet unexpectedly, check whether another layer is soloed. And if a muted layer is still audible, that's because Solo takes priority over Mute."_s,
         };
@@ -3295,7 +3369,7 @@ consteval auto CreateParams() {
             .name = "Pan"_s,
             .gui_label = "Pan"_s,
             .tooltip =
-                "Pan: place this layer in the stereo field, anywhere from fully left to fully right.\n\n"
+                "Pan places this layer in the stereo field, anywhere from fully left to fully right.\n\n"
                 "It uses a constant-power pan law (-3 dB at centre), so the layer stays at the same perceived loudness wherever you put it.\n\n"
                 "Pan is applied after the Stereo control, so you can narrow a wide sound first and then place it as a single point."_s,
         };
@@ -3311,7 +3385,7 @@ consteval auto CreateParams() {
             .name = "Stereo Width"_s,
             .gui_label = "Stereo"_s,
             .tooltip =
-                "Stereo: narrow or widen this layer's stereo image. Negative values pull it toward mono, positive values push it wider, and 0% leaves the sound as recorded.\n\n"
+                "Stereo narrows or widens this layer's stereo image. Negative values pull it toward mono, positive values push it wider, and 0% leaves the sound as recorded.\n\n"
                 "It works by splitting the sound into mid (what both channels share) and side (what differs between them), then rebalancing the two with a constant-power crossfade. At -100% only the mid remains; at +100% only the side, so anything dead centre disappears. Mono sounds have no side, so pushing to +100% silences them."_s,
         };
         lp(TuneCents) = Args {
@@ -3328,7 +3402,7 @@ consteval auto CreateParams() {
             .name = "Detune Cents"_s,
             .gui_label = "Detune"_s,
             .tooltip =
-                "Detune: fine-tune this layer's pitch in cents (100 cents is one semitone). This works by speeding up or slowing down the audio."_s,
+                "Detune fine-tunes this layer's pitch in cents (100 cents is one semitone). This works by speeding up or slowing down the audio."_s,
         };
         lp(TuneSemitone) = Args {
             .id = id(region, 5), // never change
@@ -3338,7 +3412,7 @@ consteval auto CreateParams() {
             .name = "Pitch Semitones"_s,
             .gui_label = "Pitch"_s,
             .tooltip =
-                "Pitch: shift this layer's pitch in semitones. This works by speeding up or slowing down the audio.\n\n"
+                "Pitch moves this layer up or down in semitones. This works by speeding up or slowing down the audio.\n\n"
                 "Tip: for a multisampled Instrument, you might get better results from Transpose on the CONFIG tab. It changes which samples are played rather than processing them, which can sound more natural."_s,
         };
 
@@ -3353,7 +3427,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Loop},
             .name = "Loop Mode"_s,
             .gui_label = "Loop"_s,
-            .tooltip = "The mode for looping the samples"_s,
+            .tooltip =
+                "Select the Loop Mode for this layer. Floe can loop a portion of the sound for as long as you hold a note, so even a short sample can sustain indefinitely.\n\n"
+                "Some Instruments come with loop points built in, while others let you set your own on the waveform. You can also turn looping off. There's 2 modes: 'standard' wrap-around loops jump from the loop end back to the start; 'ping-pong' loops bounce back and forth, alternating playback direction.\n\n"
+                "The options that are available depend on the Instrument: library authors can provide built-in loops, allow or disallow custom loops, or require that certain sounds always loop."_s,
         };
         lp(LoopStart) = Args {
             .id = id(region, 7), // never change
@@ -3363,7 +3440,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Loop},
             .name = "Start"_s,
             .gui_label = "Start"_s,
-            .tooltip = "Loop-start"_s,
+            .tooltip =
+                "Set the loop start point, where the loop begins within the sample. While a note is held, playback loops between here and the loop end."_s,
         };
         lp(LoopEnd) = Args {
             .id = id(region, 8), // never change
@@ -3373,7 +3451,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Loop},
             .name = "End"_s,
             .gui_label = "End"_s,
-            .tooltip = "Loop-end"_s,
+            .tooltip =
+                "Set the loop end point, where the loop finishes within the sample. While a note is held, playback loops between the loop start and here."_s,
         };
         lp(LoopCrossfade) = Args {
             .id = id(region, 9), // never change
@@ -3383,7 +3462,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Loop},
             .name = "Crossfade Size"_s,
             .gui_label = "XFade"_s,
-            .tooltip = "Crossfade length; this smooths the transition from the loop-end to the loop-start"_s,
+            .tooltip =
+                "Set the size of the loop crossfade, which blends audio across the loop point so the loop doesn't click. A small amount usually helps, especially for sustained or tonal sounds.\n\n"
+                "Floe keeps the crossfade within the loop and the sample, so it shrinks automatically if you make the loop too small for it."_s,
         };
         lp(SampleOffset) = Args {
             .id = id(region, 11), // never change
@@ -3414,7 +3495,9 @@ consteval auto CreateParams() {
             .name = "On"_s,
             .gui_label = "Volume Envelope"_s,
             .tooltip =
-                "Enable/disable the volume envelope; when disabled, each sound will play out entirely"_s,
+                "Switch the volume envelope on or off.\n\n"
+                "When it's off, every note plays its sample straight through to the end, however briefly you press the key. Handy for one-shot sounds that should always be heard in full. Looping is disabled while the envelope is off, since nothing would ever bring a looping note to an end.\n\n"
+                "Careful: with the envelope off, notes can't be cut short, so voices pile up if you play quickly, which costs CPU."_s,
         };
         lp(VolumeAttack) = Args {
             .id = id(region, 14), // never change
@@ -3423,7 +3506,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::VolEnv},
             .name = "Attack"_s,
             .gui_label = "Attack"_s,
-            .tooltip = "Volume fade-in length"_s,
+            .tooltip =
+                "Attack sets how long each note takes to fade in. A few milliseconds is enough to avoid clicks if you've moved the sample start point."_s,
         };
         lp(VolumeDecay) = Args {
             .id = id(region, 15), // never change
@@ -3432,7 +3516,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::VolEnv},
             .name = "Decay"_s,
             .gui_label = "Decay"_s,
-            .tooltip = "Volume ramp-down length (after the attack)"_s,
+            .tooltip = "Decay sets how long the note takes to fall to the Sustain level after the attack."_s,
         };
         lp(VolumeSustain) = Args {
             .id = id(region, 16), // never change
@@ -3441,7 +3525,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::VolEnv},
             .name = "Sustain"_s,
             .gui_label = "Sustain"_s,
-            .tooltip = "Volume level to sustain (after decay)"_s,
+            .tooltip =
+                "Sustain sets the level the note holds at while the key is down. At 0 dB, Decay has nothing to do."_s,
         };
         lp(VolumeRelease) = Args {
             .id = id(region, 17), // never change
@@ -3450,7 +3535,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::VolEnv},
             .name = "Release"_s,
             .gui_label = "Release"_s,
-            .tooltip = "Volume fade-out length (after the note is released)"_s,
+            .tooltip = "Release sets how long the note takes to fade out after you lift the key."_s,
         };
 
         // =================================================================================================
@@ -3461,7 +3546,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "On"_s,
             .gui_label = "Filter"_s,
-            .tooltip = "Enable/disable the filter"_s,
+            .tooltip =
+                "Switch the filter on or off.\n\n"
+                "It's a clean, digital-sounding state-variable filter (12 dB per octave). Every voice gets its own copy, so the filter envelope and the LFO (on the LFO tab) can sweep each note independently.\n\n"
+                "Tip: for broader tone shaping, the EQ tab has a three-band equaliser."_s,
         };
         lp(LegacyFilterCutoff) = Args {
             .id = id(region, 19), // never change
@@ -3481,7 +3569,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Cutoff Frequency"_s,
             .gui_label = "Cut"_s,
-            .tooltip = "The frequency at which the filter should take effect"_s,
+            .tooltip =
+                "Cutoff Frequency sets where the filter takes effect. The filter envelope and the LFO sweep the cutoff around this value, so it's the centre of any modulation rather than the starting point."_s,
         };
         lp(LegacyFilterResonance) = Args {
             .id = id(region, 20), // never change
@@ -3501,7 +3590,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Resonance"_s,
             .gui_label = "Res"_s,
-            .tooltip = "The intensity of the volume peak at the cutoff frequency"_s,
+            .tooltip =
+                "Resonance emphasises the frequencies at the cutoff. At 0% the slope is smooth and rounded; at 100% it peaks by around 20 dB, without ever self-oscillating.\n\n"
+                "For the band-pass, notch and band-shelving types it also narrows the band, and for Peak it sets the size of the boost."_s,
         };
         lp(LegacyFilterType) = Args {
             .id = id(region, 21), // never change
@@ -3527,7 +3618,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Type"_s,
             .gui_label = "Type"_s,
-            .tooltip = "Filter type"_s,
+            .tooltip =
+                "Select the filter type. Hover over the options in the menu for a description of each."_s,
         };
         lp(FilterEnvAmount) = Args {
             .id = id(region, 22), // never change
@@ -3539,7 +3631,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Envelope Amount"_s,
             .gui_label = "Env"_s,
-            .tooltip = "How strongly the envelope should control the filter cutoff"_s,
+            .tooltip =
+                "Envelope Amount sets how strongly the filter envelope (shown to the right) moves the cutoff on every note. At 0% the envelope does nothing. Turn it up and the cutoff follows the envelope's shape, rising and falling with it. Turn it down and the cutoff moves the opposite way, falling as the envelope rises.\n\n"
+                "The envelope is centred on the Cutoff setting: the top half of the display pushes the cutoff above it, the bottom half pulls it below. A negative amount flips this.\n\n"
+                "For example, with a low-pass filter, a long attack opens the sound up gradually at the start of each note."_s,
         };
         lp(FilterAttack) = Args {
             .id = id(region, 23), // never change
@@ -3548,7 +3643,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Attack"_s,
             .gui_label = "Attack"_s,
-            .tooltip = "Length of initial ramp-up"_s,
+            .tooltip = "Attack sets how long the filter envelope takes to reach its peak."_s,
         };
         lp(FilterDecay) = Args {
             .id = id(region, 24), // never change
@@ -3557,7 +3652,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Decay"_s,
             .gui_label = "Decay"_s,
-            .tooltip = "Length ramp-down after attack"_s,
+            .tooltip =
+                "Decay sets how long the filter envelope takes to fall to the Sustain level after the attack."_s,
         };
         lp(FilterSustain) = Args {
             .id = id(region, 25), // never change
@@ -3566,7 +3662,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Sustain"_s,
             .gui_label = "Sustain"_s,
-            .tooltip = "Level to sustain after decay has completed"_s,
+            .tooltip = "Sustain sets the level the filter envelope holds at while the key is down."_s,
         };
         lp(FilterRelease) = Args {
             .id = id(region, 26), // never change
@@ -3575,7 +3671,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Main, ParameterModule::Filter},
             .name = "Release"_s,
             .gui_label = "Release"_s,
-            .tooltip = "Length of ramp-down after note is released"_s,
+            .tooltip =
+                "Release sets how long the filter envelope takes to fall back after you lift the key."_s,
         };
 
         // =================================================================================================
@@ -3586,7 +3683,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "On"_s,
             .gui_label = "LFO"_s,
-            .tooltip = "Enable/disable the Low Frequency Oscillator (LFO)"_s,
+            .tooltip =
+                "Switch this layer's LFO on or off.\n\n"
+                "The LFO (low frequency oscillator) is a slow, repeating wave that moves one of this layer's controls in a repeating pattern, such as adding a tremolo effect."_s,
         };
         lp(LegacyLfoShape) = Args {
             .id = id(region, 28), // never change
@@ -3612,7 +3711,8 @@ consteval auto CreateParams() {
             .name = "Mode"_s,
             .gui_label = "Mode"_s,
             .tooltip =
-                "Oscillator phase mode. Retrigger: each voice has its own phase, Free: all voices that are playing simultaneously will have the same phase"_s,
+                "Choose where the LFO starts when you play a new note.\n\n"
+                "With Retrigger, every note starts the LFO from the beginning of its cycle. With Free, a new note joins in wherever this layer's sounding notes have reached, so every note modulates precisely together."_s,
         };
         lp(LfoAmount) = Args {
             .id = id(region, 30), // never change
@@ -3624,7 +3724,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Amount"_s,
             .gui_label = "Amount"_s,
-            .tooltip = "Intensity of the LFO effect"_s,
+            .tooltip =
+                "Amount sets how far the LFO moves its target. 0% is no movement at all and 100% is the full range for that target: silence to full level for Volume, a semitone either way for Pitch, and so on.\n\n"
+                "Negative values flip the shape upside down, so a falling sawtooth becomes a rising one. The LFO display shows the shape at the current Amount."_s,
         };
         lp(LegacyLfoDestination) = Args {
             .id = id(region, 31), // never change
@@ -3663,7 +3765,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Time (Tempo Synced)"_s,
             .gui_label = "Time"_s,
-            .tooltip = "LFO rate (synced to the host)"_s,
+            .tooltip =
+                "Time sets how long one LFO cycle lasts, as a note length at your DAW's tempo. 1/4 is a quarter note; a D on the end is dotted (one and a half times as long) and a T is triplet (two thirds as long).\n\n"
+                "The LFO follows tempo changes, but it isn't locked to the bar: each cycle starts from the note, as set by Mode."_s,
         };
         lp(LfoRateHz) = Args {
             .id = id(region, 33), // never change
@@ -3672,7 +3776,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Time (Hz)"_s,
             .gui_label = "Time"_s,
-            .tooltip = "LFO rate (in Hz)"_s,
+            .tooltip =
+                "Time sets how fast the LFO cycles, in Hz (cycles per second). It runs from a slow 0.1 Hz, one cycle every ten seconds, up to a fluttering 20 Hz.\n\n"
+                "Tip: for movement that stays in time with your track, switch Sync on and choose a note length instead."_s,
         };
         lp(LfoSyncSwitch) = Args {
             .id = id(region, 34), // never change
@@ -3681,7 +3787,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Sync On"_s,
             .gui_label = "Sync"_s,
-            .tooltip = "Sync the LFO speed to the host"_s,
+            .tooltip =
+                "Sync ties the LFO's speed to your DAW's tempo. When it's on, Time is chosen as a note length that follows the tempo; when it's off, Time is set freely in Hz.\n\n"
+                "Both settings are remembered, so you can flick between them without losing either."_s,
         };
         lp(LegacyLfoShapeV2) = Args {
             .id = id(region, 67), // never change
@@ -3709,7 +3817,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Shape"_s,
             .gui_label = "Shape"_s,
-            .tooltip = "Oscillator shape, including random and percussive waveforms"_s,
+            .tooltip =
+                "Choose the Shape of the LFO. Alongside the classics there are a few more interesting options, such as random and plucky shapes. Hover over each menu item for a description."_s,
         };
         lp(LfoDestination) = Args {
             .id = id(region, 68), // never change
@@ -3722,7 +3831,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Lfo},
             .name = "Target"_s,
             .gui_label = "Target"_s,
-            .tooltip = "The parameter that the LFO will modulate"_s,
+            .tooltip =
+                "Choose the Target: what the LFO modulates.\n\n"
+                "The modulation is applied relative to the target's current knob/slider. For example, when Volume is chosen, the movement will occur around wherever the layer's volume slider is currently set. Hover over each option for details."_s,
         };
 
         // =================================================================================================
@@ -4059,7 +4170,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback},
             .name = "Play Mode"_s,
             .gui_label = "Mode"_s,
-            .tooltip = "How this layer plays its samples"_s,
+            .tooltip =
+                "Select the Play Mode for this layer: the engine it uses to play its Instrument.\n\n"
+                "Standard Playback plays each sample straight through: the playhead moves steadily from start to end, with options for looping and reversing along the way.\n\n"
+                "The granular modes instead rebuild the sound from a stream of tiny snippets called grains. In Granular Playback, the point grains are drawn from moves through the sample at a rate you set with Speed, giving a time-stretch-like effect. In Granular Fixed, you place that point yourself with Position, letting you freeze on one part of the sample and explore its texture."_s,
         };
         lp(GranularSpeed) = Args {
             .id = id(region, 58), // never change
@@ -4084,7 +4198,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Granular},
             .name = "Speed"_s,
             .gui_label = "Speed"_s,
-            .tooltip = "How fast the grain position moves through the sample"_s,
+            .tooltip =
+                "Speed sets how fast the playhead travels through the sample in Granular Playback mode. Grains are drawn from wherever the playhead is.\n\n"
+                "100% is the sample's original speed. Turn it down to slow the sound to a crawl or stop it altogether, or up to race through at up to eight times normal speed. The playhead still respects the sample start, looping and Reverse settings.\n\n"
+                "In Granular Fixed, this knob is replaced by Position."_s,
         };
         lp(GranularPosition) = Args {
             .id = id(region, 59), // never change
@@ -4094,7 +4211,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Granular},
             .name = "Position"_s,
             .gui_label = "Position"_s,
-            .tooltip = "Where in the sample grains are sourced from"_s,
+            .tooltip =
+                "Position chooses where in the sample grains are drawn from, shown as the highlighted region on the waveform. Grains come from here for as long as you hold the note, so you can freeze on one moment of the sound and sustain it indefinitely.\n\n"
+                "Tip: you can create movement with this parameter by setting the LFO's target to Grain Position, or by assigning this knob to a macro."_s,
         };
         lp(GranularDensity) = Args {
             .id = id(region, 60), // never change
@@ -4105,7 +4224,8 @@ consteval auto CreateParams() {
             .name = "Density"_s,
             .gui_label = "Density"_s,
             .tooltip =
-                "Controls how densely grains overlap, relative to the grain length. At the midpoint, grains play end-to-end. Lower values add gaps between grains for a sparse texture; higher values make grains overlap for a denser, richer sound"_s,
+                "Density sets how many grains overlap at once, relative to their Length. At 0%, each grain starts as the previous one ends, so they follow on one after another. Turning it up starts new grains sooner, stacking more and more of them on top of each other.\n\n"
+                "Low values give an open texture where individual grains can be picked out. High values pile up so many grains that they smear into a thick, continuous wash."_s,
         };
         lp(GranularLength) = Args {
             .id = id(region, 57), // never change
@@ -4115,7 +4235,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Granular},
             .name = "Length"_s,
             .gui_label = "Length"_s,
-            .tooltip = "Duration of each grain snippet"_s,
+            .tooltip =
+                "Length sets how long each grain lasts, from a few milliseconds up to a second.\n\n"
+                "Short grains chop the sound into a fine, buzzy texture that keeps little of the original's shape. Long grains preserve much more of the sample's natural character. Density and Smooth are both measured relative to Length, so changing it here changes how they feel too."_s,
         };
         lp(GranularSpread) = Args {
             .id = id(region, 61), // never change
@@ -4135,7 +4257,8 @@ consteval auto CreateParams() {
             .name = "Spread"_s,
             .gui_label = "Spread"_s,
             .tooltip =
-                "Region around the playhead where grains can start from. Small values focus grains near the playhead, large values spread them across a wider area"_s,
+                "Spread widens the area of the sample that grains can start from. Each new grain begins somewhere between the playhead and a point up to this far past it, measured as a percentage of the whole sample.\n\n"
+                "Small values keep every grain close to the playhead for a focused, precise sound. Large values scatter grains across a wide stretch of the sample."_s,
         };
         lp(GranularSmoothing) = Args {
             .id = id(region, 62), // never change
@@ -4146,7 +4269,8 @@ consteval auto CreateParams() {
             .name = "Smooth"_s,
             .gui_label = "Smooth"_s,
             .tooltip =
-                "Crossfade between grains to remove clicks. Low is hard cuts, high is full overlap fade"_s,
+                "Smooth shapes the envelope of each grain: how gently it fades in and out, relative to its Length.\n\n"
+                "At 0% grains start and stop abruptly, giving a hard, percussive edge. At 100% the fade-in and fade-out meet in the middle, so neighbouring grains blend into each other for a seamless texture."_s,
         };
         lp(GranularRandomPan) = Args {
             .id = id(region, 63), // never change
@@ -4157,7 +4281,8 @@ consteval auto CreateParams() {
             .name = "Pan"_s,
             .gui_label = "Pan"_s,
             .tooltip =
-                "Randomise the stereo position of each grain. At 0% all grains play centred, at 100% grains can be panned anywhere from fully left to fully right"_s,
+                "Pan randomises where each grain sits in the stereo field. Every new grain is given its own position, picked at random within the range you set here.\n\n"
+                "At 0% every grain plays dead centre. At 100% grains can land anywhere from fully left to fully right, spreading the cloud from one side to the other. A quick way to create an interestingly wide stereo image."_s,
         };
         lp(GranularRandomDetune) = Args {
             .id = id(region, 64), // never change
@@ -4168,7 +4293,8 @@ consteval auto CreateParams() {
             .name = "Detune"_s,
             .gui_label = "Detune"_s,
             .tooltip =
-                "Randomise the pitch of each grain. At 0% all grains play at the original pitch, at 100% grains can be detuned up to a semitone up or down"_s,
+                "Detune randomises the pitch of each grain. Every new grain is nudged sharp or flat by a random amount within the range you set here.\n\n"
+                "At 0% all grains play in tune. At 100% each grain can be up to a semitone sharp or flat. Small amounts thicken the sound like a chorus; larger amounts get progressively more smeared and out of tune."_s,
         };
         lp(GranularRandomDirection) = Args {
             .id = id(region, 65), // never change
@@ -4179,7 +4305,8 @@ consteval auto CreateParams() {
             .name = "Direction"_s,
             .gui_label = "Direction"_s,
             .tooltip =
-                "Chance that grains spawn playing in the opposite direction to the main playhead. At 0% all grains play in the main direction, at 100% there's a 50/50 chance of each grain playing forwards or backwards"_s,
+                "Direction gives each grain a chance of playing the opposite way to the main playhead.\n\n"
+                "At 0% every grain follows the playhead's direction. At 100% each grain is equally likely to play forwards or backwards. In between, you can dial in a blend of the two for meandering, less predictable tones."_s,
         };
         lp(GranularHarmony) = Args {
             .id = id(region, 66), // never change
@@ -4190,7 +4317,9 @@ consteval auto CreateParams() {
             .name = "Harmony"_s,
             .gui_label = "Harmony"_s,
             .tooltip =
-                "Chance that grains spawn at one of the selected harmony intervals instead of the root pitch. Configure which intervals are active using the Intervals button"_s,
+                "Harmony gives each grain a chance of playing at a musical interval above or below the note you played, so a single note can bloom into a chord or a shimmering octave.\n\n"
+                "At 0% every grain plays at the root. Turning it up shifts more of the grains, until at 100% every grain picks at random from the root and the intervals you've chosen.\n\n"
+                "Choose which intervals are allowed with the Intervals menu next to this knob: pick a preset such as Octaves or Major Triad, or toggle individual semitones yourself."_s,
         };
 
         // Arpeggiator
@@ -4550,6 +4679,7 @@ constexpr Optional<ParamIndex> ParamIndexFromIdString(String id_string) {
 }
 
 Span<String const> ParameterMenuItems(ParamIndex param_index);
+Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_index);
 
 String ParamMenuText(ParamIndex index, f32 value);
 inline bool ParamToBool(f32 value) { return value != 0; }

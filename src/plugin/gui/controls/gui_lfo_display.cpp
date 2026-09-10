@@ -82,7 +82,8 @@ static void DoLfoDisplayDrag(GuiState& g,
                              imgui::Id id,
                              DescribedParamValue const& amount_param,
                              DescribedParamValue const& rate_param,
-                             bool sync_on) {
+                             bool sync_on,
+                             bool greyed_out) {
     auto& imgui = g.imgui;
     auto& processor = g.engine.processor;
     auto const& frame_input = GuiIo().in;
@@ -145,15 +146,26 @@ static void DoLfoDisplayDrag(GuiState& g,
     AddParamContextMenuBehaviour(g, window_r, id, Array {amount_param, rate_param});
 
     DescribedParamValue const* popup_params[] = {&amount_param, &rate_param};
-    Tooltip(g,
-            id,
-            window_r,
-            {
-                .value_popup = FunctionRef<String()> {[&]() -> String {
-                    return ParamValuePopupText(popup_params, g.scratch_arena);
-                }},
-                .tooltip = "Drag left/right for time, up/down for amount"_s,
-            });
+    Tooltip(
+        g,
+        id,
+        window_r,
+        {
+            .value_popup = FunctionRef<String()> {[&]() -> String {
+                return ParamValuePopupText(popup_params, g.scratch_arena);
+            }},
+            .tooltip = FunctionRef<String()> {[&]() -> String {
+                constexpr String k_description =
+                    "A preview of the LFO's movement: the current Shape at the current Amount, with faster Time settings showing more cycles. When Sync is on, it's drawn as it would run at 120 BPM."_s;
+                if (greyed_out)
+                    return fmt::Format(g.scratch_arena,
+                                       "{}\n\nThe LFO is off right now, so this is only a preview.",
+                                       k_description);
+                return k_description;
+            }},
+            .tooltip_footer =
+                "Drag left/right to change Time, up/down to change Amount. Shift-drag for fine control. Right-click for more options."_s,
+        });
 }
 
 void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out) {
@@ -180,7 +192,7 @@ void DoLfoDisplay(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out)
 
     if (!IsAnyLegacyOverriding(amount_param.info.index, params.values) &&
         !IsAnyLegacyOverriding(rate_param.info.index, params.values))
-        DoLfoDisplayDrag(g, window_rect, drag_id, amount_param, rate_param, sync_on);
+        DoLfoDisplayDrag(g, window_rect, drag_id, amount_param, rate_param, sync_on, greyed_out);
 
     // Background.
     imgui.draw_list->AddRectFilled(window_rect, LiveCol(UiColMap::EqBack), WwToPixels(k_corner_rounding));

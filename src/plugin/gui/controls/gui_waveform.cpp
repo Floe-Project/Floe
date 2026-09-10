@@ -59,14 +59,33 @@ static bool IsMultisampledInstrument(LayerProcessor const& layer) {
 
 enum class MultisampleDisplay : u8 { Representative, LastPlayed, Paused };
 
-static Optional<String> WaveformTooltipText(LayerProcessor const& layer,
+static Optional<String> WaveformTooltipText(ArenaAllocator& arena,
+                                            LayerProcessor const& layer,
+                                            Optional<param_values::PlayMode> play_mode,
                                             MultisampleDisplay multisample_display) {
 #define WAVEFORM_INTRO "The waveform display. "
-#define VOICE_MARKERS  "The red markers are voices, each one tracking through the sample as it plays."_s
 #define MULTISAMPLE_INTRO                                                                                    \
     WAVEFORM_INTRO                                                                                           \
     "This Instrument contains many samples, and the one you hear depends on which note you play and how "    \
     "hard. "
+
+    auto const markers = ({
+        String m = "The red markers are voices, each one tracking through the sample as it plays."_s;
+        if (play_mode) switch (*play_mode) {
+                case param_values::PlayMode::Standard: break;
+                case param_values::PlayMode::GranularPlayback:
+                    m = "The red markers are voices. Each one is the point grains are being drawn from, tracking through the sample as it plays. The lilac lines are the individual grains."_s;
+                    break;
+                case param_values::PlayMode::GranularFixed:
+                    m = "The lilac lines are individual grains. The highlighted region is where they can be drawn from, set by the Position and Spread controls."_s;
+                    break;
+                case param_values::PlayMode::Count: PanicIfReached();
+            }
+        m;
+    });
+    auto const with_markers = [&](String body) -> Optional<String> {
+        return fmt::Format(arena, "{}{}", body, markers);
+    };
 
     switch (layer.instrument.tag) {
         case InstrumentType::None: return k_nullopt;
@@ -78,22 +97,26 @@ static Optional<String> WaveformTooltipText(LayerProcessor const& layer,
             switch (inst.instrument.category) {
                 case sample_lib::SamplerCategory::Empty: return k_nullopt;
                 case sample_lib::SamplerCategory::SingleSample:
-                    return WAVEFORM_INTRO
-                        "This is the sample that this layer's Instrument plays. " VOICE_MARKERS;
+                    return with_markers(WAVEFORM_INTRO
+                                        "This is the sample that this layer's Instrument plays. "_s);
                 case sample_lib::SamplerCategory::Sliced:
-                    return WAVEFORM_INTRO
-                        "This is the sample that this layer's Instrument plays, with vertical lines marking where it's divided into slices for tempo-synced playback. " VOICE_MARKERS;
+                    return with_markers(
+                        WAVEFORM_INTRO
+                        "This is the sample that this layer's Instrument plays, with vertical lines marking where it's divided into slices for tempo-synced playback. "_s);
                 case sample_lib::SamplerCategory::Multisample:
                     switch (multisample_display) {
                         case MultisampleDisplay::Representative:
-                            return MULTISAMPLE_INTRO
-                                "Until you play a note, this shows a representative sample chosen by the library. " VOICE_MARKERS;
+                            return with_markers(
+                                MULTISAMPLE_INTRO
+                                "Until you play a note, this shows a representative sample chosen by the library. "_s);
                         case MultisampleDisplay::LastPlayed:
-                            return MULTISAMPLE_INTRO
-                                "This shows the sample from the most recently played note. " VOICE_MARKERS;
+                            return with_markers(
+                                MULTISAMPLE_INTRO
+                                "This shows the sample from the most recently played note. "_s);
                         case MultisampleDisplay::Paused:
-                            return MULTISAMPLE_INTRO
-                                "Notes are changing too quickly to follow, so the display is paused on a recent sample until things settle. " VOICE_MARKERS;
+                            return with_markers(
+                                MULTISAMPLE_INTRO
+                                "Notes are changing too quickly to follow, so the display is paused on a recent sample until things settle. "_s);
                     }
             }
         }
@@ -101,7 +124,6 @@ static Optional<String> WaveformTooltipText(LayerProcessor const& layer,
     return k_nullopt;
 
 #undef WAVEFORM_INTRO
-#undef VOICE_MARKERS
 #undef MULTISAMPLE_INTRO
 }
 
@@ -135,6 +157,7 @@ struct PlayModeFeatures {
     bool show_loop_controls;
     bool show_crossfade;
     bool show_grain_position_indicator;
+    bool show_voice_cursors;
     bool show_macro_destinations;
 };
 
@@ -147,6 +170,7 @@ static PlayModeFeatures GetPlayModeFeatures(param_values::PlayMode play_mode) {
                 .show_loop_controls = true,
                 .show_crossfade = true,
                 .show_grain_position_indicator = false,
+                .show_voice_cursors = true,
                 .show_macro_destinations = true,
             };
         case param_values::PlayMode::GranularPlayback:
@@ -156,6 +180,7 @@ static PlayModeFeatures GetPlayModeFeatures(param_values::PlayMode play_mode) {
                 .show_loop_controls = true,
                 .show_crossfade = true,
                 .show_grain_position_indicator = false,
+                .show_voice_cursors = true,
                 .show_macro_destinations = false,
             };
         case param_values::PlayMode::GranularFixed:
@@ -165,6 +190,7 @@ static PlayModeFeatures GetPlayModeFeatures(param_values::PlayMode play_mode) {
                 .show_loop_controls = false,
                 .show_crossfade = false,
                 .show_grain_position_indicator = true,
+                .show_voice_cursors = false,
                 .show_macro_destinations = false,
             };
         case param_values::PlayMode::Count: PanicIfReached();
@@ -212,6 +238,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
         f32 start;
         f32 end;
         f32 crossfade;
+        bool custom_loops_allowed;
     };
 
     auto const single_builtin_loop = ({
@@ -227,6 +254,8 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                             .start = (f32)checked_loop.start / (f32)num_frames,
                             .end = (f32)checked_loop.end / (f32)num_frames,
                             .crossfade = (f32)checked_loop.crossfade / (f32)num_frames,
+                            .custom_loops_allowed =
+                                (bool)(*i)->instrument.loop_overview.user_defined_loops_allowed,
                         };
                     }
                 }
@@ -327,9 +356,11 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                                          });
     };
 
+    // tooltip_text: if empty, the parameter's own description is used.
     auto do_handle_slider = [&](imgui::Id id,
                                 Span<ParamIndex const> params,
                                 Optional<ParamIndex> tooltip_param,
+                                String tooltip_text,
                                 Rect grabber_unregistered,
                                 f32 value,
                                 f32 default_val,
@@ -365,7 +396,10 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                                         .mouse_button = MouseButton::Left,
                                         .event = MouseButtonEvent::DoubleClick,
                                     })) {
-            g.param_text_editor_to_open = params[0];
+            g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {
+                .param = params[0],
+                .widget_id = ParamTextEditorOverlayId(g.imgui),
+            };
         }
 
         if (g.imgui.IsHotOrActive(id, MouseButton::Left))
@@ -380,13 +414,43 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 ParameterJustStoppedMoving(g.engine.processor, p);
 
         if (tooltip_param) {
-            // Place tooltips clear of the whole waveform rather than just the grabber, so they never cover
-            // the waveform you're editing.
-            auto const avoid_r = g.imgui.ViewportRectToWindowRect(r);
-            auto param_obj = g.engine.processor.main_params.DescribedValue(*tooltip_param);
-            ParameterTooltip(g, param_obj, id, grabber_r, avoid_r, k_dragger_tooltip_footer);
+            auto const param_obj = g.engine.processor.main_params.DescribedValue(*tooltip_param);
+            Tooltip(g,
+                    id,
+                    grabber_r,
+                    {
+                        .value_popup = FunctionRef<String()> {[&]() -> String {
+                            return ParamValuePopupText(param_obj, g.scratch_arena);
+                        }},
+                        .tooltip = FunctionRef<String()> {[&]() -> String {
+                            return tooltip_text.size ? tooltip_text
+                                                     : ParamTooltipText(param_obj, g.scratch_arena);
+                        }},
+                        .tooltip_footer = k_dragger_tooltip_footer,
+                        // Place tooltips clear of the whole waveform rather than just the grabber, so
+                        // they never cover the waveform you're editing.
+                        .avoid_r = g.imgui.ViewportRectToWindowRect(r),
+                    });
         }
     };
+
+    // For handles that are drawn but can't be dragged. Uses its own id so the handle doesn't take on
+    // the hover colour, which would suggest it's draggable.
+    auto do_fixed_handle_tooltip =
+        [&](imgui::Id id, Rect grabber_unregistered, String value_popup, String tooltip_text) {
+            if (grabber_unregistered.w == 0) return;
+            auto const grabber_r = g.imgui.RegisterAndConvertRect(grabber_unregistered);
+            g.imgui.RegisterRectForMouseTracking(grabber_r, false);
+            g.imgui.SetHot(grabber_r, id);
+            Tooltip(g,
+                    id,
+                    grabber_r,
+                    {
+                        .value_popup = value_popup,
+                        .tooltip = tooltip_text,
+                        .avoid_r = g.imgui.ViewportRectToWindowRect(r),
+                    });
+        };
 
     if (mode.value.editable || single_builtin_loop) {
         auto const loop_start = !single_builtin_loop
@@ -425,6 +489,18 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
         auto const start_param_id = ParamIndexFromLayerParamIndex(layer.index, LayerParamIndex::LoopStart);
         auto const end_param_id = ParamIndexFromLayerParamIndex(layer.index, LayerParamIndex::LoopEnd);
 
+        auto const fixed_loop_hint = ({
+            String h {};
+            if (single_builtin_loop)
+                h = single_builtin_loop->custom_loops_allowed
+                        ? "To set your own, choose one of the Custom Loop modes from the Loop menu."_s
+                        : "This Instrument doesn't allow custom loop points."_s;
+            h;
+        });
+        auto const fixed_value_popup = [&](DescribedParamValue const& param, f32 value) -> String {
+            return g.scratch_arena.Clone(*param.info.LinearValueToString(value));
+        };
+
         // Reads the loop points fresh from the params rather than the values captured at the start of the
         // frame, since the caller has just changed them.
         auto set_xfade_size_if_needed = [&]() {
@@ -460,6 +536,12 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 do_handle_slider(start_id,
                                  Array {start_param_id, xfade_param_id},
                                  start_param_id,
+                                 reverse
+                                     ? (String)fmt::Format(g.scratch_arena,
+                                                           "{}\n\nReverse is on, so the display is mirrored: "
+                                                           "the loop start sits on the right.",
+                                                           param.info.tooltip)
+                                     : String {},
                                  grabber,
                                  param.LinearValue(),
                                  param.DefaultLinearValue(),
@@ -469,6 +551,15 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                                      SetParameterValue(g.engine.processor, start_param_id, val, {});
                                      set_xfade_size_if_needed();
                                  });
+            else
+                do_fixed_handle_tooltip(
+                    g.imgui.MakeId("loop start fixed"),
+                    grabber,
+                    fixed_value_popup(param, single_builtin_loop->start),
+                    fmt::Format(
+                        g.scratch_arena,
+                        "This loop start point is built into the Instrument, so it can't be moved. {}",
+                        fixed_loop_hint));
 
             start_line = g.imgui.RegisterAndConvertRect(start_line);
             start_handle = g.imgui.RegisterAndConvertRect(start_handle);
@@ -492,6 +583,12 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                 do_handle_slider(end_id,
                                  Array {end_param_id, xfade_param_id},
                                  end_param_id,
+                                 reverse
+                                     ? (String)fmt::Format(g.scratch_arena,
+                                                           "{}\n\nReverse is on, so the display is mirrored: "
+                                                           "the loop end sits on the left.",
+                                                           param.info.tooltip)
+                                     : String {},
                                  grabber,
                                  param.LinearValue(),
                                  param.DefaultLinearValue(),
@@ -501,6 +598,14 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
                                      SetParameterValue(g.engine.processor, end_param_id, value, {});
                                      set_xfade_size_if_needed();
                                  });
+            else
+                do_fixed_handle_tooltip(
+                    g.imgui.MakeId("loop end fixed"),
+                    grabber,
+                    fixed_value_popup(param, single_builtin_loop->end),
+                    fmt::Format(g.scratch_arena,
+                                "This loop end point is built into the Instrument, so it can't be moved. {}",
+                                fixed_loop_hint));
 
             end_line = g.imgui.RegisterAndConvertRect(end_line);
             end_handle = g.imgui.RegisterAndConvertRect(end_handle);
@@ -516,6 +621,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
             if (region_draggable) {
                 do_handle_slider(loop_region_id,
                                  Array {start_param_id, end_param_id, xfade_param_id},
+                                 {},
                                  {},
                                  loop_region_r,
                                  loop_start,
@@ -570,12 +676,46 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
             if (reverse && mode.value.mode == sample_lib::LoopMode::Standard)
                 grabber.x -= extra_grabbing_room_x;
 
-            if (xfade_active && !single_builtin_loop) {
+            if (single_builtin_loop) {
+                do_fixed_handle_tooltip(
+                    g.imgui.MakeId("loop xfade fixed"),
+                    grabber,
+                    fixed_value_popup(param, single_builtin_loop->crossfade),
+                    fmt::Format(
+                        g.scratch_arena,
+                        "This loop crossfade is built into the Instrument, so it can't be changed. {}",
+                        fixed_loop_hint));
+            } else if (!xfade_active) {
+                do_fixed_handle_tooltip(
+                    g.imgui.MakeId("loop xfade inactive"),
+                    grabber,
+                    ParamValuePopupText(param, g.scratch_arena),
+                    loop_start == 0
+                        ? "The loop crossfade can't be used while the loop starts at the very beginning of the sample, because it needs audio before the loop start to blend in. Move the loop start later to enable it."_s
+                        : "The loop crossfade can't be used because the loop has no length."_s);
+            } else {
                 bool const invert = mode.value.mode == sample_lib::LoopMode::Standard ? !reverse : false;
+
+                auto const tooltip_text = ({
+                    String mode_note {};
+                    switch (*mode.value.mode) {
+                        case sample_lib::LoopMode::Standard:
+                            mode_note =
+                                "This is a 'standard' wrap-around loop, so the crossfade happens as playback nears the loop end, blending into the audio just before the loop start."_s;
+                            break;
+                        case sample_lib::LoopMode::PingPong:
+                            mode_note =
+                                "This is a 'ping-pong' loop, so the crossfade smooths each turnaround, blending in the audio just beyond the loop point."_s;
+                            break;
+                        case sample_lib::LoopMode::Count: PanicIfReached();
+                    }
+                    fmt::Format(g.scratch_arena, "{}\n\n{}", param.info.tooltip, mode_note);
+                });
 
                 do_handle_slider(xfade_id,
                                  {&xfade_param_id, 1},
                                  xfade_param_id,
+                                 tooltip_text,
                                  grabber,
                                  param.LinearValue(),
                                  param.DefaultLinearValue(),
@@ -618,6 +758,7 @@ static void DoWaveformControls(GuiState& g, LayerProcessor& layer, Rect r, PlayM
         do_handle_slider(offs_imgui_id,
                          {&param_id, 1},
                          param_id,
+                         {},
                          grabber,
                          param.LinearValue(),
                          param.DefaultLinearValue(),
@@ -760,8 +901,8 @@ void DoWaveformElement(GuiState& g,
     } else {
         auto const& params = g.engine.processor.main_params;
         auto const features = ({
-            auto f =
-                options.play_mode.HasValue() ? GetPlayModeFeatures(*options.play_mode) : PlayModeFeatures {};
+            auto f = options.play_mode.HasValue() ? GetPlayModeFeatures(*options.play_mode)
+                                                  : PlayModeFeatures {.show_voice_cursors = true};
             if (layer.IsSliced()) f.show_sample_offset = false;
             f;
         });
@@ -907,7 +1048,8 @@ void DoWaveformElement(GuiState& g,
                         d = MultisampleDisplay::LastPlayed;
                     d;
                 });
-                if (auto const tooltip_text = WaveformTooltipText(layer, multisample_display)) {
+                if (auto const tooltip_text =
+                        WaveformTooltipText(g.scratch_arena, layer, options.play_mode, multisample_display)) {
                     auto const id = g.imgui.MakeId("waveform");
                     g.imgui.RegisterRectForMouseTracking(window_r, false);
                     g.imgui.SetHot(window_r, id);
@@ -1023,8 +1165,9 @@ void DoWaveformElement(GuiState& g,
                                  col);
         }
 
-        // Voice cursors (shown in both modes).
-        if (has_active_voices) {
+        // Voice cursors. Hidden in GranularFixed: the playhead there is just the Position param, which
+        // the spread region already shows.
+        if (has_active_voices && features.show_voice_cursors) {
             for (auto const voice_index : Range(k_num_voices)) {
                 auto const marker = voice_waveform_markers[voice_index];
                 if (!marker.intensity || marker.layer_index != layer.index) continue;

@@ -122,7 +122,14 @@ struct GuiState : EngineListener {
 
     GuiEnvelopeCursor envelope_voice_cursors[ToInt(GuiEnvelopeType::Count)][k_num_voices] {};
 
-    Optional<ParamIndex> param_text_editor_to_open {};
+    // Several elements can show a text input for the same parameter. widget_id names the one that should,
+    // so that whichever is drawn first doesn't claim a request meant for another. k_null_id means any of
+    // them will do.
+    struct ParamTextEditorRequest {
+        ParamIndex param;
+        imgui::Id widget_id = imgui::k_null_id;
+    };
+    Optional<ParamTextEditorRequest> param_text_editor_to_open {};
 
     struct CopiedSection {
         StateSnapshot snapshot;

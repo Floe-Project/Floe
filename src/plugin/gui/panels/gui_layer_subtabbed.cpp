@@ -95,31 +95,42 @@ static void DoLoopModeSelector(GuiState& g, Box parent, LayerProcessor& layer) {
     Optional<f32> new_val {};
 
     // Text button showing current mode
-    auto const menu_btn = DoBox(g.builder,
-                                {
-                                    .parent = row,
-                                    .text = actual_loop_behaviour.value.name,
-                                    .text_colours =
-                                        ColSet {
-                                            .base = LiveColStruct(UiColMap::MidText),
-                                            .hot = LiveColStruct(UiColMap::MidTextHot),
-                                            .active = LiveColStruct(UiColMap::MidTextHot),
-                                        },
-                                    .text_justification = TextJustification::CentredLeft,
-                                    .text_overflow = TextOverflowType::ShowDotsOnRight,
-                                    .layout {
-                                        .size = {layout::k_fill_parent, k_mid_button_height},
-                                    },
-                                    .tooltip = FunctionRef<String()> {[&]() -> String {
-                                        return fmt::Format(g.scratch_arena,
-                                                           "{}: {}\n\n{} {}",
-                                                           param.info.name,
-                                                           actual_loop_behaviour.value.name,
-                                                           actual_loop_behaviour.value.description,
-                                                           actual_loop_behaviour.reason);
-                                    }},
-                                    .button_behaviour = imgui::ButtonConfig {},
-                                });
+    auto const menu_btn = DoBox(
+        g.builder,
+        {
+            .parent = row,
+            .text = actual_loop_behaviour.value.name,
+            .text_colours =
+                ColSet {
+                    .base = LiveColStruct(UiColMap::MidText),
+                    .hot = LiveColStruct(UiColMap::MidTextHot),
+                    .active = LiveColStruct(UiColMap::MidTextHot),
+                },
+            .text_justification = TextJustification::CentredLeft,
+            .text_overflow = TextOverflowType::ShowDotsOnRight,
+            .layout {
+                .size = {layout::k_fill_parent, k_mid_button_height},
+            },
+            .tooltip = FunctionRef<String()> {[&]() -> String {
+                DynamicArray<char> buf {g.scratch_arena};
+                fmt::Append(
+                    buf,
+                    "Select the Loop Mode for this layer. Floe can loop a portion of the sound for as long as you hold a note, so even a short sample can sustain indefinitely. Some Instruments come with loop points built in, while others let you set your own on the waveform.\n\nCurrently, {}.",
+                    actual_loop_behaviour.value.description);
+                if (desired_loop_mode == param_values::LoopMode::InstrumentDefault)
+                    dyn::AppendSpan(buf, " That's this Instrument's default."_s);
+                if (!actual_loop_behaviour.is_desired &&
+                    desired_loop_mode != param_values::LoopMode::InstrumentDefault)
+                    fmt::Append(buf,
+                                "\n\nYou've chosen {}, but that isn't available. {}",
+                                param_values::k_loop_mode_strings[ToInt(desired_loop_mode)],
+                                actual_loop_behaviour.reason);
+                else if (actual_loop_behaviour.reason.size)
+                    fmt::Append(buf, " {}", actual_loop_behaviour.reason);
+                return buf.ToOwnedSpan();
+            }},
+            .button_behaviour = imgui::ButtonConfig {},
+        });
 
     // Popup menu
     auto const popup_id = (imgui::Id)(SourceLocationHash() ^ param.info.id);
@@ -172,14 +183,13 @@ static void DoLoopModeSelector(GuiState& g, Box parent, LayerProcessor& layer) {
                                                        : param_values::k_loop_mode_strings[i];
 
                             DynamicArray<char> tooltip_text {g.scratch_arena};
-                            if (!valid)
-                                fmt::Append(tooltip_text,
-                                            ICON_FA_REPEAT " Not available: {}\n\n",
-                                            behaviour.reason);
+                            if (!valid) fmt::Append(tooltip_text, "Not available. {}\n\n", behaviour.reason);
                             dyn::AppendSpan(tooltip_text, LoopModeDescription(mode));
                             if (mode == param_values::LoopMode::InstrumentDefault) {
-                                fmt::Append(tooltip_text, "\n\n{}'s default behaviour: \n", layer.InstName());
-                                dyn::AppendSpan(tooltip_text, default_loop_behaviour.value.description);
+                                fmt::Append(tooltip_text,
+                                            "\n\nFor {}, this means {}.",
+                                            layer.InstName(),
+                                            default_loop_behaviour.value.description);
                                 if (auto const reason = default_loop_behaviour.reason; reason.size) {
                                     dyn::Append(tooltip_text, ' ');
                                     dyn::AppendSpan(tooltip_text, reason);
@@ -1222,6 +1232,12 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                       .text_colours = LiveColStruct(greyed_out ? UiColMap::MidTextDimmed : UiColMap::MidText),
                   });
 
+            auto const tooltip = ({
+                auto t = ParamTooltipText(param, g.builder.arena, greyed_out);
+                if (warning_tooltip.size) t = fmt::Format(g.builder.arena, "{}\n\n{}", t, warning_tooltip);
+                t;
+            });
+
             DoMenuParameter(g,
                             row,
                             param,
@@ -1229,6 +1245,8 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                                 .width = k_menu_width,
                                 .greyed_out = greyed_out,
                                 .label = false,
+                                .override_tooltip = tooltip,
+                                .tooltip_avoid_box = &row,
                             });
         };
 
@@ -1239,13 +1257,13 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                 params.IntValue<param_values::LfoDestination>(layer_index, LayerParamIndex::LfoDestination)) {
                 case param_values::LfoDestination::Filter:
                     if (!params.BoolValue(layer_index, LayerParamIndex::FilterOn))
-                        s = "Filter is off — turn the filter on to hear LFO modulation"_s;
+                        s = "The filter is off, so the LFO has nothing to move right now. Switch the filter on from the MAIN tab to hear it."_s;
                     break;
 
                 case param_values::LfoDestination::GranularPosition:
-                    if (!IsGranular(
-                            params.IntValue<param_values::PlayMode>(layer_index, LayerParamIndex::PlayMode)))
-                        s = "Playback mode is not granular — switch to a granular playback mode to hear LFO modulation"_s;
+                    if (params.IntValue<param_values::PlayMode>(layer_index, LayerParamIndex::PlayMode) !=
+                        param_values::PlayMode::GranularFixed)
+                        s = "Grain Position only has an effect in Granular Fixed play mode, so the LFO isn't doing anything right now. Choose that mode from the PLAYBACK tab to hear it."_s;
                     break;
 
                 case param_values::LfoDestination::Volume:
@@ -1284,6 +1302,7 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                             .style_system = GuiStyleSystem::MidPanel,
                             .greyed_out = greyed_out,
                             .bidirectional = true,
+                            .inactive_reason = "LFO is off"_s,
                         });
 
         // Rate column
@@ -1300,10 +1319,14 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                                     });
 
         if (params.BoolValue(layer_index, LayerParamIndex::LfoSyncSwitch)) {
+            auto const rate_param = params.DescribedValue(layer_index, LayerParamIndex::LfoRateTempoSynced);
             DoMenuParameter(g,
                             rate_col,
-                            params.DescribedValue(layer_index, LayerParamIndex::LfoRateTempoSynced),
-                            {.greyed_out = greyed_out});
+                            rate_param,
+                            {
+                                .greyed_out = greyed_out,
+                                .override_tooltip = ParamTooltipText(rate_param, g.builder.arena, greyed_out),
+                            });
         } else {
             DoKnobParameter(g,
                             rate_col,
@@ -1312,13 +1335,19 @@ static void DoLfoPage(GuiState& g, u8 layer_index, Box parent) {
                                 .width = k_knob_width,
                                 .style_system = GuiStyleSystem::MidPanel,
                                 .greyed_out = greyed_out,
+                                .inactive_reason = "LFO is off"_s,
                             });
         }
 
+        auto const sync_param = params.DescribedValue(layer_index, LayerParamIndex::LfoSyncSwitch);
         DoButtonParameter(g,
                           rate_col,
-                          params.DescribedValue(layer_index, LayerParamIndex::LfoSyncSwitch),
-                          {.width = layout::k_hug_contents, .greyed_out = greyed_out});
+                          sync_param,
+                          {
+                              .width = layout::k_hug_contents,
+                              .greyed_out = greyed_out,
+                              .override_tooltip = ParamTooltipText(sync_param, g.builder.arena, greyed_out),
+                          });
     }
 }
 
@@ -1956,15 +1985,17 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
 static void
 HarmonySelectionMenu(GuiState& g, LayerProcessor& layer, Box parent, HarmonyIntervalsBitset intervals) {
     auto const label = HarmonyIntervalsLabel(intervals, g.scratch_arena);
-    auto const intervals_btn =
-        MenuOpenButton(g.builder,
-                       parent,
-                       {
-                           .text = label,
-                           .tooltip = "Select which harmony intervals grains can spawn at"_s,
-                           .width = 70,
-                           .style_system = GuiStyleSystem::MidPanel,
-                       });
+    auto const intervals_btn = MenuOpenButton(
+        g.builder,
+        parent,
+        {
+            .text = label,
+            .tooltip =
+                "Choose which intervals the Harmony knob can shift grains to. Pick a preset such as Octaves, Fifths or Major Triad, or toggle individual semitones in the grid, up to four octaves above and below the root.\n\n"
+                "The root is always included, so grains that aren't shifted still play the note you pressed. Harmony is inactive until at least one interval is selected."_s,
+            .width = 70,
+            .style_system = GuiStyleSystem::MidPanel,
+        });
 
     auto const popup_id = (imgui::Id)(SourceLocationHash() ^ (u64)layer.index);
     if (intervals_btn.button_fired) g.imgui.OpenPopupMenu(popup_id, intervals_btn.imgui_id);
@@ -2443,6 +2474,7 @@ static void DoPlaybackPage(GuiState& g, u8 layer_index, Box parent) {
                                         .width = 28,
                                         .style_system = GuiStyleSystem::MidPanel,
                                         .greyed_out = !has_intervals,
+                                        .inactive_reason = "no intervals selected"_s,
                                     });
 
                     HarmonySelectionMenu(g, layer, row_inner, intervals);
@@ -2467,12 +2499,23 @@ static void DoEnvelopeSection(GuiState& g, u8 layer_index, Box parent) {
                                    },
                                });
 
-    DoButtonParameter(g,
-                      section,
-                      params.DescribedValue(layer_index, LayerParamIndex::VolEnvOn),
-                      {
-                          .width = layout::k_fill_parent,
-                      });
+    {
+        auto const vol_env_on_param = params.DescribedValue(layer_index, LayerParamIndex::VolEnvOn);
+        DoButtonParameter(
+            g,
+            section,
+            vol_env_on_param,
+            {
+                .width = layout::k_fill_parent,
+                .override_tooltip =
+                    layer.instrument.tag == InstrumentType::WaveformSynth
+                        ? (String)fmt::Format(
+                              g.builder.arena,
+                              "{}\n\nThis layer has a waveform Instrument, which always uses the volume envelope, so this switch has no effect right now.",
+                              vol_env_on_param.info.tooltip)
+                        : String {},
+            });
+    }
 
     {
         auto const envelope_box = DoBox(g.builder,
@@ -2796,7 +2839,14 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
             text_input_result = dragger_result.text_input_result;
         }
 
-        auto const arrows = DoMidPanelPrevNextButtons(g.builder, prev_next_row, {.greyed_out = grey});
+        auto const arrows =
+            DoMidPanelPrevNextButtons(g.builder,
+                                      prev_next_row,
+                                      {
+                                          .greyed_out = grey,
+                                          .prev_tooltip = fmt::Format(g.scratch_arena, "Decrease {}", label),
+                                          .next_tooltip = fmt::Format(g.scratch_arena, "Increase {}", label),
+                                      });
         if (arrows.prev_fired || arrows.next_fired) {
             auto val = current + (arrows.prev_fired ? -1 : 1);
             new_val = Clamp(val, min_val, max_val);

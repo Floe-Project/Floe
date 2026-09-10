@@ -174,8 +174,17 @@ void AddParamContextMenuBehaviour(GuiState& g, Box const& box, DescribedParamVal
 
 void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const> params);
 
+// Id of the text input that HandleShowingTextEditorForParams opens. Elements that request one for
+// themselves pass this as the request's widget_id.
+imgui::Id ParamTextEditorOverlayId(imgui::Context& imgui);
+
+// Whether this element should open a text input for the parameter, clearing the request if so.
+bool ConsumeParamTextEditorRequest(GuiState& g, ParamIndex param, imgui::Id widget_id);
+
 // Value popup and tooltip for custom IMGUI parameter controls (envelope grabbers, waveform handles, etc.).
 // avoid_r: region the popups are placed outside of. If nullopt, uses window_r.
+// tooltip_note: extra paragraph appended after the parameter descriptions, for things the widget knows
+// about but the parameters don't.
 void ParameterTooltip(GuiState& g,
                       DescribedParamValue const& param,
                       imgui::Id imgui_id,
@@ -187,4 +196,5 @@ void ParameterTooltip(GuiState& g,
                       imgui::Id imgui_id,
                       Rect window_r,
                       Optional<Rect> avoid_r,
-                      String tooltip_footer);
+                      String tooltip_footer,
+                      String tooltip_note = {});

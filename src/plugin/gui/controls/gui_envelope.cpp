@@ -297,7 +297,10 @@ void DoEnvelopeGui(GuiState& g,
                                       .mouse_button = MouseButton::Left,
                                       .event = MouseButtonEvent::DoubleClick,
                                   }))
-            g.param_text_editor_to_open = indices[k_attack_index];
+            g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {
+                .param = indices[k_attack_index],
+                .widget_id = ParamTextEditorOverlayId(imgui),
+            };
 
         AddParamContextMenuBehaviour(g, grabber, attack_imgui_id, attack_param);
 
@@ -361,7 +364,10 @@ void DoEnvelopeGui(GuiState& g,
                                       .mouse_button = MouseButton::Left,
                                       .event = MouseButtonEvent::DoubleClick,
                                   }))
-            g.param_text_editor_to_open = indices[k_decay_index];
+            g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {
+                .param = indices[k_decay_index],
+                .widget_id = ParamTextEditorOverlayId(imgui),
+            };
 
         AddParamContextMenuBehaviour(g, grabber, dec_sus_imgui_id, Array {decay_param, sustain_param});
 
@@ -454,7 +460,10 @@ void DoEnvelopeGui(GuiState& g,
                                       .mouse_button = MouseButton::Left,
                                       .event = MouseButtonEvent::DoubleClick,
                                   }))
-            g.param_text_editor_to_open = indices[k_release_index];
+            g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {
+                .param = indices[k_release_index],
+                .widget_id = ParamTextEditorOverlayId(imgui),
+            };
 
         if (imgui.IsHotOrActive(release_imgui_id, MouseButton::Left))
             GuiIo().out.wants.cursor_type = CursorType::HorizontalArrows;

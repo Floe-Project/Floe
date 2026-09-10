@@ -16,6 +16,22 @@ Span<String const> ParameterMenuItems(ParamIndex param_index) {
     return MenuItems(param.menu_type);
 }
 
+Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_index) {
+    auto const& param = k_param_descriptors[ToInt(param_index)];
+    ASSERT_EQ(param.value_type, ParamValueType::Menu);
+    switch (param.menu_type) {
+        case ParamDescriptor::MenuType::LayerFilterType:
+            return LayerFilterTypeDescription((param_values::LayerFilterType)item_index);
+        case ParamDescriptor::MenuType::LfoShape:
+            return LfoShapeDescription((param_values::LfoShape)item_index);
+        case ParamDescriptor::MenuType::LfoDestination:
+            return LfoDestinationDescription((param_values::LfoDestination)item_index);
+        case ParamDescriptor::MenuType::LfoRestartMode:
+            return LfoRestartModeDescription((param_values::LfoRestartMode)item_index);
+        default: return k_nullopt;
+    }
+}
+
 Optional<f32> ParamDescriptor::StringToLinearValue(String str) const {
     str = WhitespaceStripped(str);
 

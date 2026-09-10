@@ -119,7 +119,7 @@ static void DoParamContextMenu(GuiState& g, Box root, Span<ParamIndex const> par
                              .tooltip = "Open a text input to enter a value for the parameter"_s,
                          })
                     .button_fired) {
-                g.param_text_editor_to_open = param_index;
+                g.param_text_editor_to_open = GuiState::ParamTextEditorRequest {.param = param_index};
             }
         }
 
@@ -446,10 +446,12 @@ static void DoParamMenuItems(GuiState& g, ParamIndex param_index) {
     for (auto const [index, item] : Enumerate(ParameterMenuItems(param_index))) {
         g.builder.imgui.PushId(index);
         DEFER { g.builder.imgui.PopId(); };
+        auto const description = ParameterMenuItemDescription(param_index, (u32)index);
         if (MenuItem(g.builder,
                      menu_root,
                      {
                          .text = item,
+                         .tooltip = description ? TooltipString {*description} : TooltipString {k_nullopt},
                          .is_selected = (int)index == current,
                      })
                 .button_fired) {
@@ -586,7 +588,25 @@ Box DoMenuParameter(GuiState& g,
                           .viewport_config = k_default_popup_menu_viewport,
                       });
 
-    auto const arrows = DoMidPanelPrevNextButtons(g.builder, row, {.greyed_out = options.greyed_out});
+    auto const arrows = ({
+        auto const min_val = (int)param.info.linear_range.min;
+        auto const max_val = (int)param.info.linear_range.max;
+        auto const current = param.IntValue<int>();
+        auto const prev_val = current == min_val ? max_val : current - 1;
+        auto const next_val = current == max_val ? min_val : current + 1;
+        DoMidPanelPrevNextButtons(
+            g.builder,
+            row,
+            {
+                .greyed_out = options.greyed_out,
+                .prev_tooltip = fmt::Format(g.builder.arena,
+                                            "Switch to the previous option: {}",
+                                            ParamMenuText(param.info.index, (f32)prev_val)),
+                .next_tooltip = fmt::Format(g.builder.arena,
+                                            "Switch to the next option: {}",
+                                            ParamMenuText(param.info.index, (f32)next_val)),
+            });
+    });
     if (!legacy_override && (arrows.prev_fired || arrows.next_fired)) {
         auto val = (f32)(param.IntValue<int>() + (arrows.prev_fired ? -1 : 1));
         if (val < param.info.linear_range.min) val = param.info.linear_range.max;
@@ -826,8 +846,7 @@ Box DoKnobParameter(GuiState& g,
 
     // Focus the text input if requested.
     if (g.builder.IsInputAndRenderPass()) {
-        if (g.param_text_editor_to_open && *g.param_text_editor_to_open == param.info.index) {
-            g.param_text_editor_to_open.Clear();
+        if (ConsumeParamTextEditorRequest(g, param.info.index, container.imgui_id)) {
             g.imgui.SetTextInputFocus(container.imgui_id, display_string, false);
             g.imgui.TextInputSelectAll();
         }
@@ -1020,8 +1039,7 @@ Box DoVerticalSliderParameter(GuiState& g,
 
     // Focus the text input if requested.
     if (g.builder.IsInputAndRenderPass()) {
-        if (g.param_text_editor_to_open && *g.param_text_editor_to_open == param.info.index) {
-            g.param_text_editor_to_open.Clear();
+        if (ConsumeParamTextEditorRequest(g, param.info.index, container.imgui_id)) {
             g.imgui.SetTextInputFocus(container.imgui_id, display_string, false);
             g.imgui.TextInputSelectAll();
         }
@@ -1348,7 +1366,14 @@ Box DoIntParameter(GuiState& g,
         DoLegacyOverrideOverlay(g, window_r, param.info.index);
     }
 
-    auto const arrows = DoMidPanelPrevNextButtons(g.builder, row, {.greyed_out = options.greyed_out});
+    auto const arrows = DoMidPanelPrevNextButtons(
+        g.builder,
+        row,
+        {
+            .greyed_out = options.greyed_out,
+            .prev_tooltip = fmt::Format(g.builder.arena, "Decrease {}", param.info.gui_label),
+            .next_tooltip = fmt::Format(g.builder.arena, "Increase {}", param.info.gui_label),
+        });
     if (!legacy_override && (arrows.prev_fired || arrows.next_fired)) {
         auto val = (f32)(param.IntValue<int>() + (arrows.prev_fired ? -1 : 1));
         val = Clamp(val, param.info.linear_range.min, param.info.linear_range.max);
@@ -1365,10 +1390,8 @@ Box DoIntParameter(GuiState& g,
 
     // Focus the text input if requested.
     if (g.builder.IsInputAndRenderPass()) {
-        if (g.param_text_editor_to_open && *g.param_text_editor_to_open == param.info.index) {
-            g.param_text_editor_to_open.Clear();
+        if (ConsumeParamTextEditorRequest(g, param.info.index, dragger_box.imgui_id))
             g.imgui.SetTextInputFocus(dragger_box.imgui_id, display_string, false);
-        }
     }
 
     // Label.
@@ -1490,7 +1513,14 @@ Box DoPercentDraggerParameter(GuiState& g,
         DoLegacyOverrideOverlay(g, window_r, param.info.index);
     }
 
-    auto const arrows = DoMidPanelPrevNextButtons(g.builder, row, {.greyed_out = options.greyed_out});
+    auto const arrows = DoMidPanelPrevNextButtons(
+        g.builder,
+        row,
+        {
+            .greyed_out = options.greyed_out,
+            .prev_tooltip = fmt::Format(g.builder.arena, "Decrease {}", param.info.gui_label),
+            .next_tooltip = fmt::Format(g.builder.arena, "Increase {}", param.info.gui_label),
+        });
     if (!legacy_override && (arrows.prev_fired || arrows.next_fired)) {
         auto val = Clamp((f32)(percent + (arrows.prev_fired ? -1 : 1)) / 100.0f, 0.0f, 1.0f);
         SetParameterValue(g.engine.processor, param.info.index, val, {});
@@ -1531,12 +1561,26 @@ constexpr imgui::TextInputConfig k_param_text_input_flags = {
     .select_all_when_opening = true,
 };
 
+imgui::Id ParamTextEditorOverlayId(imgui::Context& imgui) { return imgui.MakeId("text input"); }
+
+bool ConsumeParamTextEditorRequest(GuiState& g, ParamIndex param, imgui::Id widget_id) {
+    if (!g.param_text_editor_to_open) return false;
+    if (g.param_text_editor_to_open->param != param) return false;
+    if (g.param_text_editor_to_open->widget_id != imgui::k_null_id &&
+        g.param_text_editor_to_open->widget_id != widget_id)
+        return false;
+    g.param_text_editor_to_open.Clear();
+    return true;
+}
+
 void HandleShowingTextEditorForParams(GuiState& g, Rect r, Span<ParamIndex const> params) {
     if (g.param_text_editor_to_open) {
-        for (auto const p : params) {
-            if (p == *g.param_text_editor_to_open) {
-                auto const id = g.imgui.MakeId("text input");
+        auto const requested_widget_id = g.param_text_editor_to_open->widget_id;
+        auto const id = ParamTextEditorOverlayId(g.imgui);
+        if (requested_widget_id != imgui::k_null_id && requested_widget_id != id) return;
 
+        for (auto const p : params) {
+            if (p == g.param_text_editor_to_open->param) {
                 auto const p_obj = g.engine.processor.main_params.DescribedValue(p);
                 auto const str = p_obj.info.LinearValueToString(p_obj.LinearValue());
                 ASSERT(str.HasValue());
@@ -1584,7 +1628,8 @@ void ParameterTooltip(GuiState& g,
                       imgui::Id imgui_id,
                       Rect window_r,
                       Optional<Rect> avoid_r,
-                      String tooltip_footer) {
+                      String tooltip_footer,
+                      String tooltip_note) {
     Tooltip(g,
             imgui_id,
             window_r,
@@ -1593,15 +1638,14 @@ void ParameterTooltip(GuiState& g,
                     return ParamValuePopupText(params, g.scratch_arena);
                 }},
                 .tooltip = FunctionRef<String()> {[&]() -> String {
-                    if (params.size == 1) return ParamTooltipText(*params[0], g.scratch_arena);
+                    if (params.size == 1 && !tooltip_note.size)
+                        return ParamTooltipText(*params[0], g.scratch_arena);
                     DynamicArray<char> buf {g.scratch_arena};
                     for (auto param : params) {
-                        fmt::Append(buf,
-                                    "{}: {}",
-                                    param->info.gui_label,
-                                    ParamTooltipText(*param, g.scratch_arena));
+                        dyn::AppendSpan(buf, ParamTooltipText(*param, g.scratch_arena));
                         if (param != Last(params)) fmt::Append(buf, "\n\n");
                     }
+                    if (tooltip_note.size) fmt::Append(buf, "\n\n{}", tooltip_note);
                     return buf.ToOwnedSpan();
                 }},
                 .tooltip_footer = tooltip_footer,

@@ -242,30 +242,10 @@ static void DoLoopModeSelector(GuiState& g, Box parent, LayerProcessor& layer) {
         }
     }
 
-    // Slider behaviour and parameter lifecycle
     if (auto const viewport_r = BoxRect(g.builder, menu_btn)) {
         auto const window_r = g.imgui.RegisterAndConvertRect(*viewport_r);
 
-        auto current = param.LinearValue();
-        if (g.imgui.SliderBehaviourRange({
-                .rect_in_window_coords = window_r,
-                .id = menu_btn.imgui_id,
-                .min = param.info.linear_range.min,
-                .max = param.info.linear_range.max,
-                .value = current,
-                .default_value = param.info.default_linear_value,
-                .cfg = {.sensitivity = 20},
-            })) {
-            new_val = current;
-        }
-
-        if (g.imgui.WasJustActivated(menu_btn.imgui_id, MouseButton::Left))
-            ParameterJustStartedMoving(g.engine.processor, param.info.index);
-
         if (new_val) SetParameterValue(g.engine.processor, param.info.index, *new_val, {});
-
-        if (g.imgui.WasJustDeactivated(menu_btn.imgui_id, MouseButton::Left))
-            ParameterJustStoppedMoving(g.engine.processor, param.info.index);
 
         AddParamContextMenuBehaviour(g, window_r, menu_btn.imgui_id, param);
     }

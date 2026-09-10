@@ -681,8 +681,7 @@ static void DoEffectParams(GuiState& g,
             // spacers so they stay centred at the same point, and the button appears in the right spacer
             // without shifting the rest of the layout.
             if (is_legacy)
-                DoBox(g.builder,
-                      {.parent = param_container, .layout {.size = {layout::k_fill_parent, 0}}});
+                DoBox(g.builder, {.parent = param_container, .layout {.size = {layout::k_fill_parent, 0}}});
 
             DoMenuParameter(g,
                             param_container,

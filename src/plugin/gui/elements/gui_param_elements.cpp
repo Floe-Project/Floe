@@ -619,39 +619,13 @@ Box DoMenuParameter(GuiState& g,
         new_val = val;
     }
 
-    // Slider behaviour
-    static bool slider_value_changed_during_interaction = false;
     if (auto const viewport_r = BoxRect(g.builder, menu_btn)) {
         auto const window_r = g.builder.imgui.RegisterAndConvertRect(*viewport_r);
 
         if (!legacy_override) {
-            if (g.imgui.WasJustActivated(menu_btn.imgui_id, MouseButton::Left)) {
-                slider_value_changed_during_interaction = false;
-                ParameterJustStartedMoving(g.engine.processor, param.info.index);
-            }
-
-            auto const initial_int_val = param.IntValue<int>();
-            auto current = param.LinearValue();
-            if (g.builder.imgui.SliderBehaviourRange({
-                    .rect_in_window_coords = window_r,
-                    .id = menu_btn.imgui_id,
-                    .min = param.info.linear_range.min,
-                    .max = param.info.linear_range.max,
-                    .value = current,
-                    .default_value = param.info.default_linear_value,
-                    .cfg = {.sensitivity = 20},
-                })) {
-                new_val = current;
-                if ((int)current != initial_int_val) slider_value_changed_during_interaction = true;
-            }
-
-            if (menu_btn.button_fired && !slider_value_changed_during_interaction)
-                g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
+            if (menu_btn.button_fired) g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
 
             if (new_val) SetParameterValue(g.engine.processor, param.info.index, *new_val, {});
-
-            if (g.imgui.WasJustDeactivated(menu_btn.imgui_id, MouseButton::Left))
-                ParameterJustStoppedMoving(g.engine.processor, param.info.index);
 
             AddParamContextMenuBehaviour(g, window_r, menu_btn.imgui_id, param);
         }

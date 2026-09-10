@@ -3,6 +3,7 @@
 
 #include "tests/framework.hpp"
 
+#include "benchmarks/framework.hpp"
 #include "distortion_measurement.hpp"
 
 TEST_CASE(TestNormTableIsUpToDate) {
@@ -720,4 +721,66 @@ TEST_REGISTRATION(RegisterDistortionTests) {
     REGISTER_TEST(TestAutoGainFadeAvoidsLevelStep);
     REGISTER_TEST(TestDryDelayMatchesWetLatency);
     REGISTER_TEST(TestOversamplerPassesBandAndSuppressesImages);
+}
+
+// ======================================================================================
+// Benchmarks
+
+// The full wet path for one type at a fixed drive, single stage (no punish), so each run isolates that
+// type's shaper cost rather than the shared Tape cascade the punish stages fall back to.
+BENCHMARK_FN void BenchmarkDistortionType(DistortionType type) {
+    constexpr u32 k_sample_rate = 44100;
+    constexpr u32 k_block_frames = 512;
+
+    // A couple of detuned partials so the ADAA and fold curves see a realistically varying slope.
+    Array<f32x2, k_block_frames> input;
+    for (auto const frame_index : Range(k_block_frames)) {
+        auto const t = (f32)frame_index / (f32)k_sample_rate;
+        auto const sample = 0.5f * (Sin(k_two_pi<f32> * 220 * t) + (0.3f * Sin(k_two_pi<f32> * 557 * t)));
+        input[frame_index] = f32x2 {sample, sample * 0.9f};
+    }
+
+    DistortionDsp dsp;
+    dsp.SetSampleRate(k_sample_rate);
+    dsp.SetSettings({.type = type});
+
+    constexpr DistortionDsp::Controls k_controls {.drive01 = 0.7f, .punish01 = 0};
+
+    constexpr int k_num_iterations = 1000;
+    for (auto _ : Range(k_num_iterations)) {
+        for (auto const frame_index : Range(k_block_frames)) {
+            auto out = dsp.Process(input[frame_index], k_controls);
+            benchmarks::DoNotOptimise(out);
+        }
+    }
+}
+
+BENCHMARK_REGISTRATION(RegisterDistortionBenchmarks) {
+#define BENCHMARK_DISTORTION_TYPE(name, enumerator)                                                          \
+    REGISTER_BENCHMARK_NAMED([]() { BenchmarkDistortionType(DistortionType::enumerator); },                  \
+                             "BenchmarkDistortion" name)
+
+    BENCHMARK_DISTORTION_TYPE("Tape", Tape);
+    BENCHMARK_DISTORTION_TYPE("Valve", Valve);
+    BENCHMARK_DISTORTION_TYPE("Overdrive", Overdrive);
+    BENCHMARK_DISTORTION_TYPE("HardClip", HardClip);
+    BENCHMARK_DISTORTION_TYPE("Octave", Octave);
+    BENCHMARK_DISTORTION_TYPE("Bitcrush", Bitcrush);
+    BENCHMARK_DISTORTION_TYPE("RingMod", RingMod);
+    BENCHMARK_DISTORTION_TYPE("SineFold", SineFold);
+    BENCHMARK_DISTORTION_TYPE("Warp", Warp);
+    BENCHMARK_DISTORTION_TYPE("Wavefolder", Wavefolder);
+
+    BENCHMARK_DISTORTION_TYPE("LegacyTubeLog", LegacyTubeLog);
+    BENCHMARK_DISTORTION_TYPE("LegacyTubeAsym3", LegacyTubeAsym3);
+    BENCHMARK_DISTORTION_TYPE("LegacySine", LegacySine);
+    BENCHMARK_DISTORTION_TYPE("LegacyRaph1", LegacyRaph1);
+    BENCHMARK_DISTORTION_TYPE("LegacyDecimate", LegacyDecimate);
+    BENCHMARK_DISTORTION_TYPE("LegacyAtan", LegacyAtan);
+    BENCHMARK_DISTORTION_TYPE("LegacyClip", LegacyClip);
+    BENCHMARK_DISTORTION_TYPE("LegacyFoldback", LegacyFoldback);
+    BENCHMARK_DISTORTION_TYPE("LegacyRectifier", LegacyRectifier);
+    BENCHMARK_DISTORTION_TYPE("LegacyRingMod", LegacyRingMod);
+
+#undef BENCHMARK_DISTORTION_TYPE
 }

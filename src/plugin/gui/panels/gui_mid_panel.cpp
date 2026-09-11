@@ -149,7 +149,7 @@ static String MidPanelTabTooltip(MidPanelTab tab) {
         case MidPanelTab::Layers:
             return "The Layers page: Floe's three independent layers, shown side by side.\n\nEach layer is identical and plays at the same time as the others. Load an Instrument into a layer to give it a sound source, then shape it with the layer's own playback, envelope, LFO and EQ controls. Blending layers is how rich, complex sounds are built."_s;
         case MidPanelTab::Effects:
-            return "The Effects page: a reorderable rack of effects that processes the mix of all three layers.\n\nThe layers are mixed into a single signal which then flows through the rack from top to bottom. Drag effects to reorder them, and use the switchboard on the left to add or remove them."_s;
+            return "The Effects page: a reorderable rack of effects that processes the mix of all three layers.\n\nThe layers are mixed into a single signal which then flows through the rack from top to bottom. Drag effects to reorder them, and use the switchboard on the left to add or remove them, or to jump to one in the rack."_s;
         case MidPanelTab::Count: PanicIfReached();
     }
 }

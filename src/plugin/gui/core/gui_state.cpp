@@ -98,6 +98,7 @@ static constexpr auto k_used_icons = Array {
     String {ICON_FA_MICROCHIP},
     String {ICON_FA_MUSIC},
     String {ICON_FA_PEN},
+    String {ICON_FA_PLUS},
     String {ICON_FA_POWER_OFF},
     String {ICON_FA_REPEAT},
     String {ICON_FA_RIGHT_LONG},

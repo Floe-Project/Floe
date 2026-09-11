@@ -2194,7 +2194,7 @@ consteval auto CreateParams() {
         .name = "Type"_s,
         .gui_label = "Type"_s,
         .tooltip =
-            "Distortion algorithm type. The modern types keep their loudness steady as the drive is increased; the Legacy types are the original algorithms without that compensation"_s,
+            "The Type decides the character and flavour of the distortion. Some are warmer and saturating while others focus on interesting sound mangling. The modern types keep their loudness steady as the drive is increased; the Legacy types are the original algorithms without that compensation."_s,
     };
     mp(DistortionDrive) = Args {
         .id = id(IdRegion::Master, 4), // never change

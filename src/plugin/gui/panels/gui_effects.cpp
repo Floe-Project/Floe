@@ -31,7 +31,6 @@ constexpr f32 k_fx_controls_gap_x = 28;
 constexpr f32 k_fx_controls_gap_y = 8;
 constexpr f32 k_fx_heading_h = 18;
 constexpr f32 k_fx_heading_text_pad_lr = 8;
-constexpr f32 k_fx_icon_width = 20.5f;
 
 constexpr auto k_phaser_params = ComptimeParamSearch<ComptimeParamSearchOptions {
     .modules = {ParameterModule::Effect, ParameterModule::Phaser},
@@ -121,7 +120,50 @@ static void DoFxRackCopyPasteMenuItems(GuiState& g, Box root) {
     }
 }
 
-static void DoEffectRightClickMenu(GuiState& g, imgui::Id button_id, Rect window_r, EffectType type) {
+// Keeps the relative order within both groups, but moves every effect that isn't in the rack below every
+// effect that is.
+static EffectsArray TidiedEffectsOrder(EffectsArray const& effects,
+                                       Bitset<k_num_effect_types> const& in_rack) {
+    EffectsArray result {};
+    usize index = 0;
+    for (auto const fx : effects)
+        if (in_rack.Get(ToInt(fx->type))) result[index++] = fx;
+    for (auto const fx : effects)
+        if (!in_rack.Get(ToInt(fx->type))) result[index++] = fx;
+    ASSERT(index == effects.size);
+    return result;
+}
+
+static void DoTidyOrderMenuItem(GuiState& g, Box root) {
+    auto& processor = g.engine.processor;
+    auto const current_order = processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed);
+    auto const tidy_order = EncodeEffectsArray(
+        TidiedEffectsOrder(DecodeEffectsArray(current_order, processor.effects_ordered_by_type),
+                           g.engine.fx_visible));
+    auto const already_tidy = tidy_order == current_order;
+
+    if (MenuItem(g.builder,
+                 root,
+                 {
+                     .text = "Tidy Switchboard Order"_s,
+                     .tooltip = "Move the effects that aren't in the rack below the ones that are"_s,
+                     .mode = already_tidy ? MenuItemOptions::Mode::Disabled : MenuItemOptions::Mode::Active,
+                     .no_icon_gap = true,
+                 })
+            .button_fired &&
+        !already_tidy) {
+        processor.desired_effects_order.Store(tidy_order, StoreMemoryOrder::Release);
+        processor.inbox_flags.FetchOr(audio_thread_inbox::FxOrderChanged, RmwMemoryOrder::Release);
+        processor.host.request_process(&processor.host);
+        RecordUndoableStep(g.engine, "FX order");
+    }
+}
+
+static void DoEffectRightClickMenu(GuiState& g,
+                                   imgui::Id button_id,
+                                   Rect window_r,
+                                   EffectType type,
+                                   bool in_switchboard) {
     auto const right_click_id = g.imgui.MakeId(SourceLocationHash() + ToInt(type));
     auto const name = k_effect_info[ToInt(type)].name;
 
@@ -136,6 +178,7 @@ static void DoEffectRightClickMenu(GuiState& g, imgui::Id button_id, Rect window
                     DoEffectCopyPasteMenuItems(g, root, type);
                     MenuDivider(g.builder, root);
                     DoFxRackCopyPasteMenuItems(g, root);
+                    if (in_switchboard) DoTidyOrderMenuItem(g, root);
                     MenuDivider(g.builder, root);
 
                     StateSnapshotSection const target {
@@ -248,9 +291,16 @@ static void DoKnobJoiningLine(GuiState& g, Box knob1, Box knob2) {
     }
 }
 
+// Switchboard cards are narrow so they use the abbreviated names; the rack heading has room for the
+// unabbreviated name.
+static String EffectRackHeadingName(EffectType type) {
+    if (type == EffectType::ConvolutionReverb) return "Convolution Reverb"_s;
+    return k_effect_info[ToInt(type)].name;
+}
+
 static Box DoEffectHeading(GuiState& g, Effect& fx, Box parent, bool at_rack_top_left) {
     auto const cols = GetFxColMap(fx.type);
-    auto const name = k_effect_info[ToInt(fx.type)].name;
+    auto const name = EffectRackHeadingName(fx.type);
 
     auto const heading_btn =
         DoBox(g.builder,
@@ -446,12 +496,96 @@ static void DoImpulseResponseSelector(GuiState& g,
           });
 }
 
+// The right portion of a switchboard card shows a cross when the effect is in the rack and a plus when it
+// isn't. Only the cross is a zone of its own: it removes the effect, whereas clicking anywhere else on the
+// card scrolls the rack to it, adding it first if needed.
+static Rect SwitchboardCardIconRect(Rect card_r) {
+    auto const w = WwToPixels(26.0f);
+    return {.xywh = {card_r.Right() - w, card_r.y, w, card_r.h}};
+}
+
+static Rect SwitchboardCardGripRect(Rect card_r) {
+    auto const w = WwToPixels(18.0f);
+    return {.xywh = {SwitchboardCardIconRect(card_r).x - w, card_r.y, w, card_r.h}};
+}
+
+struct SwitchboardCardOptions {
+    EffectType type;
+    bool in_rack; // Whether the effect is in the rack at all, not whether it's bypassed.
+    // The body and the remove button light up separately so it's clear which one the cursor will act on.
+    bool body_hot;
+    bool remove_hot;
+    bool show_grip;
+};
+
+static void DrawSwitchboardCard(GuiState& g, Rect card_r, SwitchboardCardOptions const& options) {
+    auto& draw_list = *g.imgui.draw_list;
+    auto const cols = GetFxColMap(options.type);
+    auto const rounding = WwToPixels(k_corner_rounding);
+
+    draw_list.AddRectFilled(card_r,
+                            ToU32(Col {.c = Col::White,
+                                       .alpha = options.body_hot  ? (u8)22
+                                                : options.in_rack ? (u8)10
+                                                                  : (u8)0}),
+                            rounding);
+    draw_list.AddRect(card_r,
+                      ToU32(Col {.c = Col::White, .alpha = options.in_rack ? (u8)40 : (u8)30}),
+                      rounding,
+                      0b1111,
+                      WwToPixels(1.0f));
+
+    auto const inactive_col = ToU32(Col {.c = Col::White, .alpha = options.body_hot ? (u8)80 : (u8)35});
+
+    // Light: the effect's colour when it's in the rack, dim when it isn't.
+    {
+        auto const light_w = WwToPixels(3.0f);
+        auto const light_r = Rect {
+            .xywh = {card_r.x + WwToPixels(6.0f), card_r.y + (card_r.h * 0.25f), light_w, card_r.h * 0.5f}};
+        draw_list.AddRectFilled(light_r, options.in_rack ? LiveCol(cols.button) : inactive_col, light_w / 2);
+    }
+
+    auto const text_r = card_r.CutLeft(WwToPixels(15.0f)).CutRight(SwitchboardCardIconRect(card_r).w);
+    draw_list.AddTextInRect(text_r,
+                            options.in_rack ? LiveCol(UiColMap::MidText)
+                                            : ToU32(Col {.c = Col::White, .alpha = 100}),
+                            k_effect_info[ToInt(options.type)].name,
+                            {.justification = TextJustification::CentredLeft});
+
+    g.fonts.Push(ToInt(FontType::Icons));
+    DEFER { g.fonts.Pop(); };
+
+    {
+        auto const icon_r = SwitchboardCardIconRect(card_r);
+        if (options.in_rack && options.remove_hot) {
+            draw_list.AddRectFilled(icon_r.ReducedVertically(WwToPixels(4.0f)),
+                                    ToU32(Col {.c = Col::White, .alpha = 30}),
+                                    rounding);
+        }
+        draw_list.AddTextInRect(icon_r,
+                                options.in_rack
+                                    ? LiveCol(options.remove_hot ? UiColMap::MidTextHot : UiColMap::MidIcon)
+                                    : inactive_col,
+                                options.in_rack ? ICON_FA_XMARK ""_s : ICON_FA_PLUS ""_s,
+                                {
+                                    .justification = TextJustification::Centred,
+                                    .font_scaling = 0.8f,
+                                });
+    }
+
+    if (options.show_grip)
+        draw_list.AddTextInRect(SwitchboardCardGripRect(card_r),
+                                LiveCol(UiColMap::FXButtonGripIcon),
+                                ICON_FA_ARROWS_UP_DOWN ""_s,
+                                {.justification = TextJustification::Centred, .font_scaling = 0.7f});
+}
+
 struct EffectSectionInfo {
     Effect* fx;
     Box container;
 };
 
-// Switchboard: effect toggle buttons arranged in a single column.
+// Switchboard: a full-height column of cards, one per effect type, in chain order.
 static void DoSwitchboard(GuiState& g, Box root) {
     auto ordered_effects =
         DecodeEffectsArray(g.engine.processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
@@ -459,23 +593,24 @@ static void DoSwitchboard(GuiState& g, Box root) {
 
     Array<Box, k_num_effect_types> slots {};
 
+    // Filling the parent divides the column evenly, so the cards stay the same size as each other and as a
+    // whole fill the panel, whatever the effect is doing.
     for (auto const slot : Range(k_num_effect_types)) {
         slots[slot] = DoBox(g.builder,
                             {
                                 .parent = root,
                                 .id_extra = (u64)slot,
                                 .layout {
-                                    .size = {120.0f, 18.0f},
+                                    .size = {150.0f, layout::k_fill_parent},
                                 },
                             });
     }
 
     if (g.builder.IsInputAndRenderPass()) {
         auto& draw_list = *g.imgui.draw_list;
-        auto const corner_rounding = WwToPixels(k_corner_rounding);
 
         // Registered before the slots so each slot's own menu takes precedence; this only fires on the
-        // empty space around the toggles.
+        // empty space around the cards.
         if (auto const r = BoxRect(g.builder, root))
             TryOpenFxRackContextMenu(g, g.imgui.ViewportRectToWindowRect(*r), SourceLocationHash());
 
@@ -490,81 +625,84 @@ static void DoSwitchboard(GuiState& g, Box root) {
                 if (g.dragging_fx_switch->drop_slot != slot)
                     GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::ImmediatelyUpdate);
                 g.dragging_fx_switch->drop_slot = slot;
-                draw_list.AddRectFilled(window_slot_r, LiveCol(UiColMap::FXButtonDropZone), corner_rounding);
+                draw_list.AddRectFilled(window_slot_r,
+                                        LiveCol(UiColMap::FXButtonDropZone),
+                                        WwToPixels(k_corner_rounding));
             } else {
                 // Normal slot
                 auto fx = ordered_effects[fx_index++];
                 if (g.dragging_fx_switch && fx == g.dragging_fx_switch->fx) fx = ordered_effects[fx_index++];
 
-                auto const fx_cols = GetFxColMap(fx->type);
-                bool const is_visible = g.engine.fx_visible.Get(ToInt(fx->type));
+                bool const in_rack = g.engine.fx_visible.Get(ToInt(fx->type));
+                auto const name = k_effect_info[ToInt(fx->type)].name;
 
-                // Toggle button: register behaviour
                 auto const btn_id = g.imgui.MakeId(SourceLocationHash() + ToInt(fx->type));
                 bool const fired = g.imgui.ButtonBehaviour(window_slot_r, btn_id, {});
                 bool const is_hot = g.imgui.IsHot(btn_id);
                 bool const is_active = g.imgui.IsActive(btn_id, MouseButton::Left);
 
-                // Toggle icon (coloured when on, grey when off)
-                auto const icon_text = is_visible ? ICON_FA_TOGGLE_ON ""_s : ICON_FA_TOGGLE_OFF ""_s;
-                auto const icon_col = is_visible ? LiveCol(fx_cols.button)
-                                                 : ((is_hot || is_active) ? LiveCol(UiColMap::MidIcon)
-                                                                          : LiveCol(UiColMap::MidIcon));
-                auto const icon_width = WwToPixels(k_fx_icon_width);
-                auto const icon_r = window_slot_r.WithW(icon_width);
+                auto const grip_r = SwitchboardCardGripRect(window_slot_r);
+                g.imgui.RegisterRectForMouseTracking(grip_r);
+                bool const cursor_over_grip = grip_r.Contains(GuiIo().in.cursor_pos);
+                bool const cursor_over_remove =
+                    in_rack && SwitchboardCardIconRect(window_slot_r).Contains(GuiIo().in.cursor_pos);
 
-                {
-                    g.fonts.Push(ToInt(FontType::Icons));
-                    DEFER { g.fonts.Pop(); };
-                    draw_list.AddTextInRect(
-                        icon_r,
-                        icon_col,
-                        icon_text,
-                        {.justification = TextJustification::CentredLeft, .font_scaling = 0.75f});
-                }
+                DrawSwitchboardCard(g,
+                                    window_slot_r,
+                                    {
+                                        .type = fx->type,
+                                        .in_rack = in_rack,
+                                        .body_hot = (is_hot || is_active) && !cursor_over_remove,
+                                        .remove_hot = is_hot && cursor_over_remove,
+                                        .show_grip = (is_hot || cursor_over_grip) && !cursor_over_remove,
+                                    });
 
-                // Text label
-                auto const text_r = window_slot_r.CutLeft(icon_width);
-                auto const text_col = LiveCol(UiColMap::MidText);
-                draw_list.AddTextInRect(text_r,
-                                        text_col,
-                                        k_effect_info[ToInt(fx->type)].name,
-                                        {.justification = TextJustification::CentredLeft});
+                auto const action = ({
+                    String s;
+                    if (!in_rack)
+                        s = fmt::Format(g.scratch_arena, "Click to add {} to the rack."_s, name);
+                    else if (cursor_over_remove)
+                        s = fmt::Format(g.scratch_arena, "Click to remove {} from the rack."_s, name);
+                    else
+                        s = fmt::Format(g.scratch_arena,
+                                        "Click to scroll the rack to {}, or click the cross to remove it."_s,
+                                        name);
+                    s;
+                });
+                String const tooltip = fmt::Format(g.scratch_arena,
+                                                   "{}\n\n{}\n\nDrag to move {} along the chain.",
+                                                   k_effect_info[ToInt(fx->type)].description,
+                                                   action,
+                                                   name);
+                Tooltip(g, btn_id, window_slot_r, {.tooltip = tooltip});
 
-                DoEffectRightClickMenu(g, btn_id, window_slot_r, fx->type);
+                DoEffectRightClickMenu(g, btn_id, window_slot_r, fx->type, true);
 
                 if (fired) {
-                    bool const new_state = !is_visible;
-                    BeginUndoableStep(g.engine, new_state ? "Add FX"_s : "Remove FX"_s);
-                    DEFER { EndUndoableStep(g.engine); };
-                    SetParameterValue(g.engine.processor,
-                                      k_effect_info[ToInt(fx->type)].on_param_index,
-                                      new_state ? 1.0f : 0.0f,
-                                      {});
-                    g.engine.fx_visible.SetToValue(ToInt(fx->type), new_state);
+                    auto const press_pos = GuiIo().in.mouse_buttons[0].last_press.point;
+                    if (in_rack && SwitchboardCardIconRect(window_slot_r).Contains(press_pos)) {
+                        BeginUndoableStep(g.engine, "Remove FX"_s);
+                        DEFER { EndUndoableStep(g.engine); };
+                        SetParameterValue(g.engine.processor,
+                                          k_effect_info[ToInt(fx->type)].on_param_index,
+                                          0.0f,
+                                          {});
+                        g.engine.fx_visible.SetToValue(ToInt(fx->type), false);
+                    } else {
+                        if (!in_rack) {
+                            BeginUndoableStep(g.engine, "Add FX"_s);
+                            DEFER { EndUndoableStep(g.engine); };
+                            SetParameterValue(g.engine.processor,
+                                              k_effect_info[ToInt(fx->type)].on_param_index,
+                                              1.0f,
+                                              {});
+                            g.engine.fx_visible.SetToValue(ToInt(fx->type), true);
+                        }
+                        g.fx_scroll_to = fx->type;
+                    }
                 }
 
-                auto const window_grab_r = ({
-                    auto w = 18.0f;
-                    auto r = window_slot_r;
-                    r.x += r.w - w;
-                    r.w = w;
-                    r;
-                });
-
-                // Grab handle icon (show only on hover)
-                g.imgui.RegisterRectForMouseTracking(window_grab_r);
-                if (is_hot || window_grab_r.Contains(GuiIo().in.cursor_pos)) {
-                    g.fonts.Push(ToInt(FontType::Icons));
-                    DEFER { g.fonts.Pop(); };
-                    draw_list.AddTextInRect(
-                        window_grab_r,
-                        LiveCol(UiColMap::FXButtonGripIcon),
-                        ICON_FA_ARROWS_UP_DOWN ""_s,
-                        {.justification = TextJustification::CentredRight, .font_scaling = 0.7f});
-                }
-                if (window_grab_r.Contains(GuiIo().in.cursor_pos))
-                    GuiIo().out.wants.cursor_type = CursorType::AllArrows;
+                if (cursor_over_grip) GuiIo().out.wants.cursor_type = CursorType::AllArrows;
 
                 // Drag start detection
                 if (is_active && !g.dragging_fx_switch) {
@@ -580,37 +718,21 @@ static void DoSwitchboard(GuiState& g, Box root) {
             }
         }
 
-        // Floating switch during drag
+        // Floating card during drag
         if (g.dragging_fx_switch) {
-            auto const fx_cols = GetFxColMap(g.dragging_fx_switch->fx->type);
-            bool const is_visible_drag = g.engine.fx_visible.Get(ToInt(g.dragging_fx_switch->fx->type));
+            Rect card_r = g.imgui.ViewportRectToWindowRect(BoxRect(g.builder, slots[0]).Value());
+            card_r.pos = GuiIo().in.cursor_pos - g.dragging_fx_switch->relative_grab_point;
 
-            Rect btn_r = g.imgui.ViewportRectToWindowRect(BoxRect(g.builder, slots[0]).Value());
-            btn_r.pos = GuiIo().in.cursor_pos - g.dragging_fx_switch->relative_grab_point;
-
-            // Toggle icon
-            auto const icon_text = is_visible_drag ? String {ICON_FA_TOGGLE_ON} : String {ICON_FA_TOGGLE_OFF};
-            auto const icon_col = is_visible_drag ? LiveCol(fx_cols.button) : LiveCol(UiColMap::MidIcon);
-            auto const icon_width = WwToPixels(k_fx_icon_width);
-            auto const icon_r = btn_r.WithW(icon_width);
-
-            {
-                g.fonts.Push(ToInt(FontType::Icons));
-                DEFER { g.fonts.Pop(); };
-                draw_list.AddTextInRect(
-                    icon_r,
-                    icon_col,
-                    icon_text,
-                    {.justification = TextJustification::CentredLeft, .font_scaling = 0.75f});
-            }
-
-            // Text label
-            auto const text_r = btn_r.CutLeft(icon_width);
-            auto const text_col = LiveCol(UiColMap::MidText);
-            draw_list.AddTextInRect(text_r,
-                                    text_col,
-                                    k_effect_info[ToInt(g.dragging_fx_switch->fx->type)].name,
-                                    {.justification = TextJustification::CentredLeft});
+            DrawSwitchboardCard(
+                g,
+                card_r,
+                {
+                    .type = g.dragging_fx_switch->fx->type,
+                    .in_rack = (bool)g.engine.fx_visible.Get(ToInt(g.dragging_fx_switch->fx->type)),
+                    .body_hot = true,
+                    .remove_hot = false,
+                    .show_grip = true,
+                });
 
             GuiIo().out.wants.cursor_type = CursorType::AllArrows;
         }
@@ -1494,7 +1616,11 @@ DoEffectSections(GuiState& g, GuiFrameContext const& frame_context, Box root, Ef
 
         auto const heading_btn = DoEffectHeading(g, *fx, left_pane, at_rack_top_left);
         if (auto const r = BoxRect(g.builder, heading_btn))
-            DoEffectRightClickMenu(g, heading_btn.imgui_id, g.imgui.ViewportRectToWindowRect(*r), fx->type);
+            DoEffectRightClickMenu(g,
+                                   heading_btn.imgui_id,
+                                   g.imgui.ViewportRectToWindowRect(*r),
+                                   fx->type,
+                                   false);
         bool const bypassed = !EffectIsOn(params, fx);
 
         if (!is_being_dragged) {
@@ -1618,6 +1744,43 @@ DoEffectSections(GuiState& g, GuiFrameContext const& frame_context, Box root, Ef
                                   {});
         }
 
+        if (auto const r = BoxRect(g.builder, section)) {
+            auto const window_r = g.imgui.ViewportRectToWindowRect(*r);
+
+            // Jump requested from the switchboard. The request is only cleared once we've actually
+            // scrolled, because on the frame an effect is added to the rack it has no section yet.
+            if (g.fx_scroll_to == fx->type) {
+                auto& viewport = *g.imgui.curr_viewport;
+
+                // Move as little as possible: nothing if the section already fits on screen, otherwise
+                // just enough to bring the nearest edge into view.
+                auto const scroll_delta = ({
+                    f32 d = 0;
+                    if (window_r.y < viewport.visible_bounds.y || window_r.h > viewport.visible_bounds.h)
+                        d = window_r.y - viewport.visible_bounds.y;
+                    else if (window_r.Bottom() > viewport.visible_bounds.Bottom())
+                        d = window_r.Bottom() - viewport.visible_bounds.Bottom();
+                    d;
+                });
+
+                // No upper clamp: scroll_max is derived from the previous frame's content height, which
+                // doesn't yet include a just-added section, so it'd cap the jump short. The viewport clamps
+                // the offset itself next frame, when it knows the real height.
+                if (scroll_delta != 0)
+                    imgui::Context::SetYScroll(&viewport, Max(0.0f, viewport.scroll_offset.y + scroll_delta));
+                g.fx_scroll_to.Clear();
+                g.imgui.StartAnimation(heading_btn.imgui_id, 1.0f, 0.5f, true);
+            }
+
+            // Brief flash so you can see where the jump landed.
+            if (auto const flash = g.imgui.GetAnimatedValue(heading_btn.imgui_id, 0.0f); flash > 0.001f) {
+                auto flash_col = LiveColStruct(cols.highlight);
+                flash_col.alpha = (u8)(flash * 45.0f);
+                g.imgui.draw_list->AddRectFilled(window_r, ToU32(flash_col));
+                GuiIo().out.IncreaseUpdateInterval(GuiFrameOutput::UpdateInterval::Animate);
+            }
+        }
+
         dyn::Append(effect_sections, EffectSectionInfo {fx, section});
     }
 
@@ -1693,7 +1856,7 @@ static void DoEffectDragAndDrop(GuiState& g,
         GuiIo().out.wants.cursor_type = CursorType::AllArrows;
 
         auto const drag_cols = GetFxColMap(g.dragging_fx_unit->fx->type);
-        auto const text = k_effect_info[ToInt(g.dragging_fx_unit->fx->type)].name;
+        auto const text = EffectRackHeadingName(g.dragging_fx_unit->fx->type);
 
         auto const cursor_pos = GuiIo().in.cursor_pos;
         auto const heading_h = WwToPixels(k_fx_heading_h);
@@ -1914,8 +2077,8 @@ void MidPanelEffectsContent(GuiBuilder& builder,
                                            .parent = root,
                                            .layout {
                                                .size = {layout::k_hug_contents, layout::k_fill_parent},
-                                               .contents_padding = {.l = 8, .t = 4, .r = 8, .b = 6},
-                                               .contents_gap = 2,
+                                               .contents_padding = {.lr = 8, .tb = 8},
+                                               .contents_gap = 4,
                                                .contents_direction = layout::Direction::Column,
                                                .contents_align = layout::Alignment::Start,
                                            },

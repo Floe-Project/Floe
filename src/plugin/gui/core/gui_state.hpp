@@ -120,6 +120,11 @@ struct GuiState : EngineListener {
     Optional<DraggingFX> dragging_fx_unit {};
     Optional<DraggingFX> dragging_fx_switch {};
 
+    // Set by the effects switchboard, consumed by the rack once it has actually scrolled the effect into
+    // view. It can take more than one frame: enabling an effect and jumping to it in the same click means
+    // the rack has no section for it until the next frame.
+    Optional<EffectType> fx_scroll_to {};
+
     GuiEnvelopeCursor envelope_voice_cursors[ToInt(GuiEnvelopeType::Count)][k_num_voices] {};
 
     // Several elements can show a text input for the same parameter. widget_id names the one that should,

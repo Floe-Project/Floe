@@ -30,6 +30,21 @@ Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_i
             return LfoDestinationDescription((param_values::LfoDestination)item_index);
         case ParamDescriptor::MenuType::LfoRestartMode:
             return LfoRestartModeDescription((param_values::LfoRestartMode)item_index);
+        case ParamDescriptor::MenuType::ArpNoteOrder: {
+            auto const description = ArpNoteOrderDescription((param_values::ArpNoteOrder)item_index);
+            return description.size ? Optional<String> {description} : k_nullopt;
+        }
+        case ParamDescriptor::MenuType::MonophonicMode:
+            return MonophonicModeDescription((param_values::MonophonicMode)item_index);
+        case ParamDescriptor::MenuType::MpeDestination: {
+            auto const description = MpeDestinationDescription((param_values::MpeDestination)item_index);
+            return description.size ? Optional<String> {description} : k_nullopt;
+        }
+        case ParamDescriptor::MenuType::ArpOctavePolyrate: {
+            auto const description =
+                ArpOctavePolyrateDescription((param_values::ArpOctavePolyrate)item_index);
+            return description.size ? Optional<String> {description} : k_nullopt;
+        }
         default: return k_nullopt;
     }
 }

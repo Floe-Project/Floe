@@ -629,6 +629,19 @@ constexpr auto k_mpe_destination_strings = ArrayT<String>({
     "Timbre",
 });
 static_assert(k_mpe_destination_strings.size == ToInt(MpeDestination::Count));
+constexpr String MpeDestinationDescription(MpeDestination destination) {
+    switch (destination) {
+        case MpeDestination::Off: return {};
+        case MpeDestination::Volume:
+            return "Fade each note in and out as the gesture moves, up to the layer's Volume setting. Good for swells and for playing one note of a chord louder than the rest."_s;
+        case MpeDestination::Filter:
+            return "Move the layer's filter cutoff per note, so you can open one note up while the others stay dark. The layer's filter needs to be switched on for this to be heard."_s;
+        case MpeDestination::Timbre:
+            return "Sweep each note through the Instrument's crossfade layers, the same thing the master Timbre knob does but note by note. Only Instruments built with crossfade layers respond."_s;
+        case MpeDestination::Count: break;
+    }
+    return {};
+}
 
 enum class LegacyLfoShapeV1 : u8 { // oldest. never reorder
     Sine,
@@ -1078,6 +1091,18 @@ constexpr auto k_monophonic_mode_strings = ArrayT<String>({
     "Latch",
 });
 static_assert(k_monophonic_mode_strings.size == ToInt(MonophonicMode::Count));
+constexpr String MonophonicModeDescription(MonophonicMode mode) {
+    switch (mode) {
+        case MonophonicMode::Off:
+            return "The layer is polyphonic: hold down a chord and every note sounds."_s;
+        case MonophonicMode::Retrigger:
+            return "Each new note cuts off whatever was sounding and starts again, so you only ever hear the most recent note. The classic monophonic lead behaviour, and also a way to stop a long sample piling up on itself."_s;
+        case MonophonicMode::Latch:
+            return "The first note you play keeps sounding and later notes are ignored, until you lift every key. Handy for holding a drone or a long pad from a single key press."_s;
+        case MonophonicMode::Count: break;
+    }
+    return {};
+}
 
 enum class StereoWidenMode : u8 { // never reorder
     Balanced,
@@ -1150,6 +1175,35 @@ constexpr auto k_arp_note_order_strings = ArrayT<String>({
     "Up+",
 });
 static_assert(k_arp_note_order_strings.size == ToInt(ArpNoteOrder::Count));
+constexpr String ArpNoteOrderDescription(ArpNoteOrder order) {
+    switch (order) {
+        case ArpNoteOrder::Chord:
+            return "Every held note sounds together on each step, so the pattern becomes rhythmic chord stabs rather than an arpeggio. Ideal for percussion and for chopping a chord into a rhythm."_s;
+        case ArpNoteOrder::Up:
+        case ArpNoteOrder::Down:
+        case ArpNoteOrder::Random: return {};
+        case ArpNoteOrder::UpDown:
+            return "Climbs to the top note then comes back down. The top and bottom notes aren't repeated at the turnarounds."_s;
+        case ArpNoteOrder::DownUp:
+            return "Falls to the bottom note then climbs back up. The top and bottom notes aren't repeated at the turnarounds."_s;
+        case ArpNoteOrder::RandomNoRepeat:
+            return "Picks at random, but avoids landing on the same note twice in a row so the pattern always keeps moving."_s;
+        case ArpNoteOrder::UpX2: return "Climbs upwards, playing each note twice before moving on."_s;
+        case ArpNoteOrder::DownX2: return "Falls downwards, playing each note twice before moving on."_s;
+        case ArpNoteOrder::UpDownX2:
+            return "Climbs to the top and back down, playing each note twice before moving on."_s;
+        case ArpNoteOrder::Converge:
+            return "Works inwards from the outside of the chord: lowest, highest, second lowest, second highest, and so on until it meets in the middle."_s;
+        case ArpNoteOrder::Diverge:
+            return "Starts in the middle of the chord and works outwards, alternating above and below."_s;
+        case ArpNoteOrder::Thumb:
+            return "Returns to the lowest note between every other note, like a thumb holding down a bass note while the fingers pick out the rest."_s;
+        case ArpNoteOrder::UpPlus:
+            return "Climbs upwards, then adds one extra step: the top note an octave higher."_s;
+        case ArpNoteOrder::Count: break;
+    }
+    return {};
+}
 
 enum class ArpOctavePolyrate : u8 { // never reorder
     Off,
@@ -1165,6 +1219,19 @@ constexpr auto k_arp_octave_polyrate_strings = ArrayT<String>({
     "4:3 at octaves",
 });
 static_assert(k_arp_octave_polyrate_strings.size == ToInt(ArpOctavePolyrate::Count));
+constexpr String ArpOctavePolyrateDescription(ArpOctavePolyrate mode) {
+    switch (mode) {
+        case ArpOctavePolyrate::Off: return {};
+        case ArpOctavePolyrate::Double:
+            return "Each octave up runs at twice the speed of the one below. The strongest of the three ratios, and the easiest to hear."_s;
+        case ArpOctavePolyrate::ThreeToTwo:
+            return "Each octave up fits three notes into the time the octave below takes for two, so the two lines pull apart and meet again."_s;
+        case ArpOctavePolyrate::FourToThree:
+            return "Each octave up fits four notes into the time the octave below takes for three. The subtlest of the three ratios, and the slowest to come back into line."_s;
+        case ArpOctavePolyrate::Count: break;
+    }
+    return {};
+}
 
 enum class ArpTriggerMode : u8 { // never reorder
     Free,
@@ -3383,7 +3450,10 @@ consteval auto CreateParams() {
             .modules = {layer_module},
             .name = "Volume"_s,
             .gui_label = "Volume"_s,
-            .tooltip = "The Layer Volume sets the level of this layer."_s,
+            .tooltip =
+                "The Layer Volume sets the level of this layer.\n\n"
+                "The marks on the slider show the level of each sounding voice: its velocity, key range fade and any MPE volume expression.\n\n"
+                "Tip: to change how velocity relates to volume, edit the velocity to volume curve on the CONFIG tab."_s,
         };
         lp(Mute) = Args {
             .id = id(region, 1), // never change
@@ -3534,8 +3604,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Playback, ParameterModule::Loop},
             .name = "Reverse On"_s,
             .gui_label = "Reverse"_s,
-            .tooltip = "Play the sound in reverse"_s,
-        };
+            .tooltip =
+                "Play the Instrument's samples backwards, from the end to the start. It works in every play mode and whether looping is on or off. The waveform display flips to match, so playback always runs from left to right (unless in the reverse portion of a ping-pong loop)."};
 
         // =================================================================================================
         lp(VolEnvOn) = Args {
@@ -3547,7 +3617,7 @@ consteval auto CreateParams() {
             .gui_label = "Volume Envelope"_s,
             .tooltip =
                 "Switch the volume envelope on or off.\n\n"
-                "When it's off, every note plays its sample straight through to the end, however briefly you press the key. Handy for one-shot sounds that should always be heard in full. Looping is disabled while the envelope is off, since nothing would ever bring a looping note to an end.\n\n"
+                "It's typically best left on. When it's off, every note plays its sample straight through to the end, however briefly you press the key. Handy for one-shot sounds that should always be heard in full. Looping is disabled while the envelope is off, since nothing would ever bring a looping note to an end.\n\n"
                 "Careful: with the envelope off, notes can't be cut short, so voices pile up if you play quickly, which costs CPU."_s,
         };
         lp(VolumeAttack) = Args {
@@ -3889,6 +3959,17 @@ consteval auto CreateParams() {
         };
 
         // =================================================================================================
+        constexpr String k_eq_type_tooltip =
+            "Choose the shape of this band: a peak or shelf for boosting and cutting, a notch for removing a narrow slice, or a pass filter for rolling off one end of the spectrum.\n\n"
+            "Only the Peak, Low-shelf and High-shelf types use the Gain knob; with the others it's inactive.";
+        constexpr String k_eq_freq_tooltip =
+            "Frequency sets where this band does its work: the centre of a peak or notch, the corner of a shelf, or the cutoff of a pass filter.";
+        constexpr String k_eq_resonance_tooltip =
+            "Resonance sets how tightly the band is focused. For the Peak and Notch types it's the width, going from broad and gentle to tight and focused. The shelves use it to steepen the transition at their corner, and the pass filters use it to add a peak at the cutoff.";
+        constexpr String k_eq_gain_tooltip =
+            "Gain sets how far this band boosts or cuts at its frequency.\n\n"
+            "Only the Peak, Low-shelf and High-shelf types use Gain. The notch and pass filters always cut by their own fixed shape, so with those the knob is inactive.";
+
         lp(EqOn) = Args {
             .id = id(region, 35), // never change
             .id_string = LAYER_ID("eq.on"),
@@ -3896,8 +3977,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq},
             .name = "On"_s,
             .gui_label = "EQ"_s,
-            .tooltip = "Turn on or off the equaliser effect for this layer"_s,
-        };
+            .tooltip =
+                "Switch on this layer's three-band equaliser to shape its tone before it's mixed with the other layers."};
         lp(LegacyEqFreq1) = Args {
             .id = id(region, 36), // never change
             .id_string = LAYER_ID("eq.band1.legacy_freq"),
@@ -3917,7 +3998,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band1},
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
-            .tooltip = "Band 1: frequency of this band"_s,
+            .tooltip = k_eq_freq_tooltip,
             .flags = {.cutoff_frequency = true},
         };
         lp(LegacyEqResonance1) = Args {
@@ -3938,7 +4019,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band1},
             .name = "Resonance"_s,
             .gui_label = "Reso"_s,
-            .tooltip = "Band 1: sharpness of the peak"_s,
+            .tooltip = k_eq_resonance_tooltip,
         };
         lp(EqGain1) = Args {
             .id = id(region, 38), // never change
@@ -3947,7 +4028,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band1},
             .name = "Gain"_s,
             .gui_label = "Gain"_s,
-            .tooltip = "Band 1: volume gain at the frequency"_s,
+            .tooltip = k_eq_gain_tooltip,
         };
         lp(LegacyEqType1) = Args {
             .id = id(region, 39), // never change
@@ -3973,7 +4054,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band1},
             .name = "Type"_s,
             .gui_label = "Type"_s,
-            .tooltip = "Band 1: type of EQ band"_s,
+            .tooltip = k_eq_type_tooltip,
         };
         lp(LegacyEqFreq2) = Args {
             .id = id(region, 40), // never change
@@ -3994,7 +4075,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band2},
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
-            .tooltip = "Band 2: frequency of this band"_s,
+            .tooltip = k_eq_freq_tooltip,
             .flags = {.cutoff_frequency = true},
         };
         lp(LegacyEqResonance2) = Args {
@@ -4015,7 +4096,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band2},
             .name = "Resonance"_s,
             .gui_label = "Reso"_s,
-            .tooltip = "Band 2: sharpness of the peak"_s,
+            .tooltip = k_eq_resonance_tooltip,
         };
         lp(EqGain2) = Args {
             .id = id(region, 42), // never change
@@ -4024,7 +4105,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band2},
             .name = "Gain"_s,
             .gui_label = "Gain"_s,
-            .tooltip = "Band 2: volume gain at the frequency"_s,
+            .tooltip = k_eq_gain_tooltip,
         };
         lp(LegacyEqType2) = Args {
             .id = id(region, 43), // never change
@@ -4050,7 +4131,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band2},
             .name = "Type"_s,
             .gui_label = "Type"_s,
-            .tooltip = "Band 2: type of EQ band"_s,
+            .tooltip = k_eq_type_tooltip,
         };
         lp(LegacyEqFreq3) = Args {
             .id = id(region, 86), // never change
@@ -4072,7 +4153,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band3},
             .name = "Frequency"_s,
             .gui_label = "Freq"_s,
-            .tooltip = "Band 3: frequency of this band"_s,
+            .tooltip = k_eq_freq_tooltip,
             .flags = {.cutoff_frequency = true},
         };
         lp(EqResonance3) = Args {
@@ -4083,7 +4164,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band3},
             .name = "Resonance"_s,
             .gui_label = "Reso"_s,
-            .tooltip = "Band 3: sharpness of the peak"_s,
+            .tooltip = k_eq_resonance_tooltip,
         };
         lp(EqGain3) = Args {
             .id = id(region, 88), // never change
@@ -4093,7 +4174,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band3},
             .name = "Gain"_s,
             .gui_label = "Gain"_s,
-            .tooltip = "Band 3: volume gain at the frequency"_s,
+            .tooltip = k_eq_gain_tooltip,
         };
         lp(EqType3) = Args {
             .id = id(region, 89), // never change
@@ -4106,7 +4187,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band3},
             .name = "Type"_s,
             .gui_label = "Type"_s,
-            .tooltip = "Band 3: type of EQ band"_s,
+            .tooltip = k_eq_type_tooltip,
         };
 
         // =================================================================================================
@@ -4132,7 +4213,8 @@ consteval auto CreateParams() {
             .name = "Keytrack On"_s,
             .gui_label = "Keytrack"_s,
             .tooltip =
-                "Tune the sound to match the key played; if disabled it will always play the sound at its root pitch"_s,
+                "With Keytrack on, this layer follows the keyboard: higher keys play higher pitches. Switch it off and every key plays the sample at its recorded pitch, which might be what you want for drum hits, loops and sound effects that shouldn't be transposed.\n\n"
+                "Some sample libraries may override this - marking individual samples as always or never keytracked."_s,
         };
         lp(LegacyMonophonicBool) = Args {
             .id = id(region, 46), // never change
@@ -4155,7 +4237,9 @@ consteval auto CreateParams() {
             .name = "Monophonic Mode"_s,
             .gui_label = "Monophonic"_s,
             .tooltip =
-                "Control voice behavior when notes overlap. Off: multiple voices play simultaneously (polyphonic). Retrigger: new notes stop previous notes. Latch: first note plays until all keys are released, new notes are ignored"_s,
+                "Monophonic decides what happens when notes on this layer overlap. Left off, the layer is polyphonic and every note you play gets a voice of its own; the other two modes hold it to one note at a time, in different ways.\n\n"
+                "It's set per layer, so a monophonic lead can sit on top of a polyphonic pad in the same preset.\n\n"
+                "The arpeggiator handles its own notes, so this has no effect while the arpeggiator is running on this layer."_s,
         };
         lp(MidiTranspose) = Args {
             .id = id(region, 48), // never change
@@ -4165,8 +4249,25 @@ consteval auto CreateParams() {
             .name = "MIDI Transpose On"_s,
             .gui_label = "Transpose"_s,
             .tooltip =
-                "Transpose the mapping of samples by the given semitone offset, meaning a higher/lower sample may be triggered instead of stretching/shrinking the audio by large amounts (only useful if the instrument is multi-sampled)"_s,
+                "Transpose shifts this layer up or down in semitones by changing which samples get triggered, rather than by speeding the audio up or down. On a multi-sampled Instrument that keeps the character of the sound intact, so it's the better choice for large shifts.\n\n"
+                "The key range isn't affected: you play the same keys as before, they just reach for different samples.\n\n"
+                "Tip: the Pitch control at the top of the layer transposes by re-pitching the audio instead. That's the one to reach for on a single-sample Instrument, and Detune beside it covers amounts smaller than a semitone."_s,
         };
+        // Range and Key Fade are four parameters describing one mechanism, so each of them explains the
+        // whole thing rather than just its own end of it.
+#define KEY_RANGE_BAR_TIP                                                                                    \
+    "\n\nTip: see each layer's range on the bar above the keyboard in the bottom panel. Hover it to "        \
+    "enlarge it, and use the octave arrows beside the keyboard to scroll beyond the keys shown."
+
+        constexpr String k_key_range_tooltip =
+            "This layer only plays within the given range of keys, letting you give each layer its own portion of the keyboard.\n\n"
+            "Key Fade below softens the edges of the range, so the layer eases in and out instead of switching on abruptly." KEY_RANGE_BAR_TIP;
+        constexpr String k_key_fade_tooltip =
+            "Key Fade eases the layer in and out at the edges of its key range instead of letting it switch on abruptly. Both values are in semitones: the left one fades up from Range Low, the right one fades down from Range High.\n\n"
+            "Give two layers overlapping fades and they crossfade into one another as you play up the keyboard." KEY_RANGE_BAR_TIP;
+
+#undef KEY_RANGE_BAR_TIP
+
         lp(KeyRangeLow) = Args {
             .id = id(region, 50), // never change
             .id_string = LAYER_ID("config.key_range_low"),
@@ -4174,8 +4275,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Config},
             .name = "Key Range Low"_s,
             .gui_label = "Key Range Low"_s,
-            .tooltip =
-                "The lowest key that will trigger this layer; if the key is lower than this, the layer will not play"_s,
+            .tooltip = k_key_range_tooltip,
         };
         lp(KeyRangeHigh) = Args {
             .id = id(region, 51), // never change
@@ -4184,8 +4284,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Config},
             .name = "Key Range High"_s,
             .gui_label = "Key Range High"_s,
-            .tooltip =
-                "The highest key that will trigger this layer; if the key is higher than this, the layer will not play"_s,
+            .tooltip = k_key_range_tooltip,
         };
         lp(KeyRangeLowFade) = Args {
             .id = id(region, 52), // never change
@@ -4194,7 +4293,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Config},
             .name = "Key Range Low Fade"_s,
             .gui_label = "Key Range Low Fade"_s,
-            .tooltip = "The length of the volume fade-in at the low end of the key range"_s,
+            .tooltip = k_key_fade_tooltip,
         };
         lp(KeyRangeHighFade) = Args {
             .id = id(region, 53), // never change
@@ -4203,7 +4302,7 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Config},
             .name = "Key Range High Fade"_s,
             .gui_label = "Key Range High Fade"_s,
-            .tooltip = "The length of the volume fade-out at the high end of the key range"_s,
+            .tooltip = k_key_fade_tooltip,
         };
         lp(PitchBendRange) = Args {
             .id = id(region, 54), // never change
@@ -4212,7 +4311,10 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Config},
             .name = "Pitch Bend Range"_s,
             .gui_label = "Pitch Bend Range"_s,
-            .tooltip = "The pitch range in semitones of the MIDI pitch wheel"_s,
+            .tooltip =
+                "Pitch Bend Range sets how far the pitch wheel bends this layer, in semitones. Each layer has its own, so for example, a lead can bend a whole tone while the pad underneath can be set to zero to ignore the wheel entirely.\n\n"
+                "Bending re-pitches the audio by speeding it up or slowing it down, so large bends will noticeably change the character of the sound.\n\n"
+                "With MPE enabled, this governs the wheel on the master channel; the per-note bend of each individual note follows the range the controller asks for."_s,
         };
         lp(PlayMode) = Args {
             .id = id(region, 56), // never change
@@ -4387,7 +4489,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Arp},
             .name = "Arpeggiator"_s,
             .gui_label = "Arpeggiator"_s,
-            .tooltip = "Enable/disable the arpeggiator"_s,
+            .tooltip =
+                "Switch on the arpeggiator to turn the notes you hold into a rhythmic pattern locked to your host's tempo. Each step retriggers this layer's Instrument exactly as if you'd played the note yourself, so the envelopes, filter, LFOs and effects all respond as normal.\n\n"
+                "Every layer has its own arpeggiator, so you can run different patterns side by side."_s,
         };
         lp(ArpMode) = Args {
             .id = id(region, 74), // never change
@@ -4400,7 +4504,8 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Arp},
             .name = "Arpeggiator Mode"_s,
             .gui_label = "Mode"_s,
-            .tooltip = "Played Notes: arpeggiates held notes. Fixed Notes: plays a recorded note sequence"_s,
+            .tooltip =
+                "Choose where the steps get their notes from. Played Notes arpeggiates whatever you're holding, giving each step one of those notes in the order set by Order. Fixed Notes ignores what you play and runs a sequence of notes you've set yourself, either by dragging each step's note or by capturing a performance with the Record button."_s,
         };
         lp(ArpNoteOrder) = Args {
             .id = id(region, 70), // never change
@@ -4413,7 +4518,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Arp},
             .name = "Note Order"_s,
             .gui_label = "Order"_s,
-            .tooltip = "Order in which held notes are played"_s,
+            .tooltip =
+                "Order sets how the notes you're holding are shared out across the steps: climbing, falling, bouncing between the two, picked at random, or one of the less common shapes. Chord is the odd one out — it plays every held note together on each step, which is ideal for rhythmic stabs and percussion.\n\n"
+                "Not available in Fixed Notes mode."_s,
         };
         lp(ArpTriggerMode) = Args {
             .id = id(region, 71), // never change
@@ -4427,7 +4534,7 @@ consteval auto CreateParams() {
             .name = "Trigger"_s,
             .gui_label = "Trigger"_s,
             .tooltip =
-                "Free: arpeggiator keeps running when new notes are pressed. Retrigger: arpeggiator restarts from step 1"_s,
+                "Trigger decides what a new note does to a pattern that's already running. Free lets it carry on, so you can change chord underneath without breaking the groove. Retrigger restarts it from step 1 every time you press a note, which keeps the pattern locked to your playing."_s,
         };
         lp(LegacyArpRate) = Args {
             .id = id(region, 72), // never change
@@ -4454,7 +4561,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Arp},
             .name = "Rate"_s,
             .gui_label = "Rate"_s,
-            .tooltip = "Arpeggiator rate (synced to host tempo)"_s,
+            .tooltip =
+                "Rate sets how long each step lasts, synced to your host's tempo. Together with Length it decides how long the whole pattern takes to come round — eight steps at 1/8 fills one bar of 4/4.\n\n"
+                "The T and D suffixes are triplet and dotted divisions, useful for swung or lopsided patterns."_s,
         };
         lp(ArpAutoRate) = Args {
             .id = id(region, 76), // never change
@@ -4468,7 +4577,8 @@ consteval auto CreateParams() {
             .name = "Auto Rate"_s,
             .gui_label = "Auto Rate"_s,
             .tooltip =
-                "Let Floe decide the rate so that the loop plays near to its original recorded rate rather than having to add large silent gaps between slices. The rate that Floe chooses varies depending on your host tempo."_s,
+                "Auto Rate lets Floe pick the step rate so a sliced Instrument plays close to the speed it was recorded at, rather than leaving silent gaps between slices when your host tempo is a long way from the loop's own. While it's on, the rate Floe has chosen is shown in place of the Rate menu.\n\n"
+                "The multiplier shifts that choice: 2x for double speed, 0.5x for half, with Dotted and Triplet variants for a different feel. Because the choice has to land on a tempo-synced division it moves in jumps as the tempo changes, and every layer using Auto Rate jumps at the same points so they stay in the same rhythmic relationship."_s,
         };
         lp(ArpLength) = Args {
             .id = id(region, 73), // never change
@@ -4478,7 +4588,9 @@ consteval auto CreateParams() {
             .modules = {layer_module, ParameterModule::Arp},
             .name = "Length"_s,
             .gui_label = "Length"_s,
-            .tooltip = "Number of active steps in the arpeggiator pattern"_s,
+            .tooltip =
+                "Length sets how many steps the pattern runs through before it loops back to the start.\n\n"
+                "Steps beyond the length are hidden from the sequencer but keep their settings, so you can shorten a pattern and lengthen it again without losing anything."_s,
         };
         lp(ArpHumanise) = Args {
             .id = id(region, 75), // never change
@@ -4489,7 +4601,8 @@ consteval auto CreateParams() {
             .name = "Humanise"_s,
             .gui_label = "Humanise"_s,
             .tooltip =
-                "Add random timing variation to note starts and velocity. Higher values create looser, more human-like performance"_s,
+                "Humanise loosens the pattern up by nudging each step's timing and velocity by a random amount. A few percent takes the machine-like edge off; higher settings give a much looser, hand-played feel, which suits percussion especially well.\n\n"
+                "Steps are only ever pushed later, never earlier, and never by more than a fifth of a step."_s,
         };
         lp(ArpOctavePolyrate) = Args {
             .id = id(region, 77), // never change
@@ -4503,7 +4616,8 @@ consteval auto CreateParams() {
             .name = "Polyrate"_s,
             .gui_label = "Polyrate"_s,
             .tooltip =
-                "Each octave plays at a different rate. Double means each octave up is 2x faster. 3:2 and 4:3 create polyrhythmic relationships between octaves"_s,
+                "Polyrate gives each octave of the notes you're holding its own speed, so a single chord can produce several interleaving rhythms at once. The octave starting at middle C plays at the Rate you've set, and the octaves above and below scale from there by the ratio you choose.\n\n"
+                "Tip: hold two notes an octave apart to hear the effect at its clearest."_s,
         };
         lp(ArpOneShot) = Args {
             .id = id(region, 78), // never change
@@ -4514,7 +4628,7 @@ consteval auto CreateParams() {
             .name = "One Shot"_s,
             .gui_label = "One Shot"_s,
             .tooltip =
-                "When enabled, the arpeggiator plays through the sequence once and then stops instead of looping"_s,
+                "With One Shot on, the pattern plays through once and stops rather than looping for as long as you hold the notes. It's handy for fills and one-off flourishes, or for letting a sliced loop play through exactly once.",
         };
 
         // =================================================================================================
@@ -4530,7 +4644,9 @@ consteval auto CreateParams() {
             .name = "MPE Press Target"_s,
             .gui_label = "Press"_s,
             .tooltip =
-                "What MPE 'press' (per-note channel pressure) controls on this layer. Only active when MPE is enabled in Performance Controls"_s,
+                "Press is the channel pressure, or aftertouch, that an MPE controller sends on each note's own channel. On most keyboards it follows how hard you're pushing into the key once it's sounding. Choose what it controls on this layer here, and how strongly with Amount beside it.\n\n"
+                "Press rests at nothing and climbs from there, so it only ever adds to the destination you point it at.\n\n"
+                "MPE has to be switched on in the Performance Controls panel before press does anything."_s,
         };
         lp(MpePressAmount) = Args {
             .id = id(region, 97), // never change
@@ -4545,7 +4661,8 @@ consteval auto CreateParams() {
             .name = "MPE Press Amount"_s,
             .gui_label = "Amount"_s,
             .tooltip =
-                "Intensity of the MPE press effect; negative values invert it. Beyond 100%, the full effect is reached with a smaller gesture"_s,
+                "Amount sets how far press moves its destination, and a negative value flips the direction so the effect runs in reverse.\n\n"
+                "Past 100% the destination reaches its limit before press reaches its own, so you get the full effect from a lighter touch."_s,
         };
         lp(MpeSlideDestination) = Args {
             .id = id(region, 98), // never change
@@ -4559,7 +4676,9 @@ consteval auto CreateParams() {
             .name = "MPE Slide Target"_s,
             .gui_label = "Slide"_s,
             .tooltip =
-                "What MPE 'slide' (per-note CC74) controls on this layer. For Volume, the slide position acts as a fader up to the layer's volume level; other destinations are bipolar around slide's centre. Only active when MPE is enabled in Performance Controls"_s,
+                "Slide is CC74, which an MPE controller sends on each note's own channel. On most keyboards it follows where your finger sits along the front-to-back axis of the key. Choose what it controls on this layer here, and how strongly with Amount beside it.\n\n"
+                "Slide rests in the middle, so it pushes the destination either side of where you've set it.\n\n"
+                "MPE has to be switched on in the Performance Controls panel before slide does anything."_s,
         };
         lp(MpeSlideAmount) = Args {
             .id = id(region, 99), // never change
@@ -4574,7 +4693,8 @@ consteval auto CreateParams() {
             .name = "MPE Slide Amount"_s,
             .gui_label = "Amount"_s,
             .tooltip =
-                "Intensity of the MPE slide effect; negative values invert it. Beyond 100%, the full effect is reached with a smaller gesture"_s,
+                "Amount sets how far slide moves its destination, and a negative value flips the direction so the effect runs in reverse.\n\n"
+                "Past 100% the destination reaches its limit before slide reaches its own, so you get the full effect from a smaller movement."_s,
         };
     }
 #undef LAYER_ID

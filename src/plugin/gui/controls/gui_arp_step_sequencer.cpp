@@ -13,6 +13,7 @@
 #include "gui/elements/gui_constants.hpp"
 #include "gui/elements/gui_element_drawing.hpp"
 #include "gui/elements/gui_modal.hpp"
+#include "gui/elements/gui_param_elements.hpp"
 #include "gui/elements/gui_popup_menu.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 
@@ -164,7 +165,10 @@ void DoArpStepSequencer(GuiState& g,
         if (imgui.WasJustDeactivated(bar_id, MouseButton::Left)) EndUndoableStep(g.engine);
 
         if (fired || imgui.IsActive(bar_id, MouseButton::Left)) {
+            // Holding the modifier resets rather than following the cursor, so you can also sweep it
+            // across a range of steps to reset them all.
             auto const y_to_vel = [&](f32 y) {
+                if (io.modifiers.Get(ModifierKey::Modifier)) return ArpStep {}.Velocity01();
                 return Clamp(1.0f - ((y - bar_rect.y) / bar_area_height), 0.0f, 1.0f);
             };
             auto const set_vel_at = [&](u32 step_index, f32 vel) {
@@ -218,7 +222,9 @@ void DoArpStepSequencer(GuiState& g,
                             arp_state.steps[cursor_step].Load(LoadMemoryOrder::Relaxed).Velocity01()));
                 }},
                 .tooltip =
-                    "Click and drag to set. How velocity translates to volume is shaped by the curve on the CONFIG tab. Right-click for more options"_s,
+                    "The height of each bar is that step's velocity. How velocity translates to volume is shaped by the curve on the CONFIG tab.\n\nTip: drag sideways across the bars to draw in a whole pattern in one go."_s,
+                .tooltip_footer = "Click and drag to set. " MODIFIER_KEY_NAME
+                                  "-click to reset. Right-click for more options."_s,
                 .avoid_r = rect,
             });
     }
@@ -411,7 +417,10 @@ void DoArpStepSequencer(GuiState& g,
                 imgui.PushId((u64)i);
                 auto const toggle_id = imgui.MakeId(SourceLocationHash());
                 if (imgui.ButtonBehaviour(label_click_rect, toggle_id, {})) {
-                    ModifyStep(arp_state, i, [](ArpStep& s) { s.on = !s.on; });
+                    if (GuiIo().in.modifiers.Get(ModifierKey::Modifier))
+                        ModifyStep(arp_state, i, [](ArpStep& s) { s.on = ArpStep {}.on; });
+                    else
+                        ModifyStep(arp_state, i, [](ArpStep& s) { s.on = !s.on; });
                     RecordUndoableStep(g.engine, "Arp step on/off"_s);
                 }
                 label_hot = imgui.IsHot(toggle_id);
@@ -420,8 +429,17 @@ void DoArpStepSequencer(GuiState& g,
                     toggle_id,
                     label_click_rect,
                     {
+                        .value_popup = FunctionRef<String()> {[&]() -> String {
+                            return fmt::Format(g.scratch_arena,
+                                               "Step {} enabled: {}",
+                                               i + 1,
+                                               arp_state.steps[i].Load(LoadMemoryOrder::Relaxed).on ? "Yes"_s
+                                                                                                    : "No"_s);
+                        }},
                         .tooltip =
-                            "Click to enable or disable this step. Disabled steps stay silent but keep their settings. Right-click for more options"_s,
+                            "Enable or disable this step. When disabled, nothing is played for this step."_s,
+                        .tooltip_footer = "Click to toggle. " MODIFIER_KEY_NAME
+                                          "-click to reset. Right-click for more options."_s,
                         .avoid_r = rect,
                     });
 
@@ -452,21 +470,17 @@ void DoArpStepSequencer(GuiState& g,
                 imgui.PopId();
             }
 
-            if (label_hot) {
-                draw_list.AddRectFilled(label_rect, WithAlphaU8(LiveCol(UiColMap::MidTextHot), 20));
-                draw_list.AddNonAABox(label_rect.Min(),
-                                      label_rect.Max(),
-                                      WithAlphaU8(LiveCol(UiColMap::MidTextHot), 120),
-                                      1);
-            } else if (!step_off) {
-                draw_list.AddRectFilled(label_rect, WithAlphaU8(LiveCol(UiColMap::CurveMapLine), 15));
+            // The border is reserved for the on/off state so that hovering can never imitate it; hot is
+            // shown by the fill instead.
+            draw_list.AddRectFilled(label_rect,
+                                    label_hot  ? WithAlphaU8(LiveCol(UiColMap::MidTextHot), 30)
+                                    : step_off ? WithAlphaU8(LiveCol(UiColMap::MidTextDimmed), 10)
+                                               : WithAlphaU8(LiveCol(UiColMap::CurveMapLine), 15));
+            if (!step_off)
                 draw_list.AddNonAABox(label_rect.Min(),
                                       label_rect.Max(),
                                       WithAlphaU8(LiveCol(UiColMap::CurveMapLine), 80),
                                       1);
-            } else {
-                draw_list.AddRectFilled(label_rect, WithAlphaU8(LiveCol(UiColMap::MidTextDimmed), 10));
-            }
 
             auto const text_rect = imgui.ViewportRectToWindowRect({
                 .x = x_vp,
@@ -635,10 +649,25 @@ void DoArpStepSequencer(GuiState& g,
                 note_id,
                 note_click_rect,
                 {
+                    .value_popup = FunctionRef<String()> {[&]() -> String {
+                        auto const live = arp_state.steps[i].Load(LoadMemoryOrder::Relaxed);
+                        if (is_fixed)
+                            return fmt::Format(g.scratch_arena,
+                                               "Step {} note: {}",
+                                               i + 1,
+                                               NoteName(live.note));
+                        return fmt::Format(g.scratch_arena,
+                                           "Step {} pitch offset: {}{} {}",
+                                           i + 1,
+                                           live.interval > 0 ? "+"_s : ""_s,
+                                           live.interval,
+                                           Abs((int)live.interval) == 1 ? "semitone"_s : "semitones"_s);
+                    }},
                     .tooltip =
                         is_fixed
-                            ? "Note played at this step. Drag to change, double-click to type a note name"_s
-                            : "Offset from the incoming note, in semitones. Drag to change, double-click to type a value"_s,
+                            ? "The note played at this step."_s
+                            : "How far this step is pitched from the note you play, in semitones. The whole pattern follows whatever you play on your keyboard."_s,
+                    .tooltip_footer = k_dragger_tooltip_footer,
                     .avoid_r = rect,
                 });
 
@@ -678,18 +707,30 @@ void DoArpStepSequencer(GuiState& g,
                 imgui.PushId((u64)(i + (k_arp_max_steps * 2)));
                 auto const tie_id = imgui.MakeId(SourceLocationHash());
                 if (imgui.ButtonBehaviour(tie_click_rect, tie_id, {})) {
-                    ModifyStep(arp_state, i, [](ArpStep& s) { s.tie = !s.tie; });
+                    if (GuiIo().in.modifiers.Get(ModifierKey::Modifier))
+                        ModifyStep(arp_state, i, [](ArpStep& s) { s.tie = ArpStep {}.tie; });
+                    else
+                        ModifyStep(arp_state, i, [](ArpStep& s) { s.tie = !s.tie; });
                     RecordUndoableStep(g.engine, "Arp step tie"_s);
                 }
                 tie_hot = imgui.IsHot(tie_id);
-                Tooltip(g,
-                        tie_id,
-                        tie_click_rect,
-                        {
-                            .tooltip =
-                                "Tie this step to the previous one so they play as a single, longer note"_s,
-                            .avoid_r = rect,
-                        });
+                Tooltip(
+                    g,
+                    tie_id,
+                    tie_click_rect,
+                    {
+                        .value_popup = FunctionRef<String()> {[&]() -> String {
+                            return fmt::Format(
+                                g.scratch_arena,
+                                "Step {} tied to previous: {}",
+                                i + 1,
+                                arp_state.steps[i].Load(LoadMemoryOrder::Relaxed).tie ? "Yes"_s : "No"_s);
+                        }},
+                        .tooltip =
+                            "Tie this step to the previous one so they play as a single, longer note. Use ties to give a pattern some long notes among the short ones."_s,
+                        .tooltip_footer = "Click to toggle. " MODIFIER_KEY_NAME "-click to reset."_s,
+                        .avoid_r = rect,
+                    });
                 imgui.PopId();
             }
 
@@ -808,7 +849,8 @@ void DoArpStepSequencer(GuiState& g,
                                                (int)Round(gate_pct));
                         }},
                         .tooltip =
-                            "Note length as a percentage of the step. 100% is legato, lower values are staccato. Drag to change, double-click to type a value"_s,
+                            "Note length as a percentage of the step. 100% is legato, lower values are staccato.\n\nGate decides when the volume envelope's release is triggered, so with a long release the steps will bleed into each other however short you set it."_s,
+                        .tooltip_footer = k_dragger_tooltip_footer,
                         .avoid_r = rect,
                     });
                 imgui.PopId();
@@ -1001,11 +1043,14 @@ void DoArpStepSequencer(GuiState& g,
         auto const btn_hot = imgui.IsHot(btn_id);
         auto const btn_active = imgui.IsActive(btn_id, MouseButton::Left);
 
-        Tooltip(g,
-                btn_id,
-                btn_rect,
-                {.tooltip =
-                     show_all ? "Return to per-step editing"_s : "Show a compact overview of all steps"_s});
+        Tooltip(
+            g,
+            btn_id,
+            btn_rect,
+            {.tooltip =
+                 show_all
+                     ? "Return to the full view, where you can edit each step's note, tie and gate as well as its velocity."_s
+                     : "Squeeze every step on screen at once so you can see the shape of the whole pattern. You can still draw velocities, but the other per-step controls are hidden."_s});
 
         // Subtle dark background so the button is visible over the step bars.
         draw_list.AddRectFilled(btn_rect, LiveCol(UiColMap::EnvelopeBack), WwToPixels(k_corner_rounding));

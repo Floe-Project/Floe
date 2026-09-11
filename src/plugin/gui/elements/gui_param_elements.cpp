@@ -571,7 +571,7 @@ Box DoMenuParameter(GuiState& g,
                 if (options.override_tooltip.size) return options.override_tooltip;
                 return ParamTooltipText(param, g.builder.arena);
             }},
-            .tooltip_footer = ParamClickableTooltipFooter(param),
+            .tooltip_footer = ParamMenuTooltipFooter(param),
             .tooltip_avoid_box = options.tooltip_avoid_box ? options.tooltip_avoid_box : &container,
             .button_behaviour = imgui::ButtonConfig {},
         });
@@ -654,8 +654,12 @@ Box DoMenuParameter(GuiState& g,
                 }
             }
 
-            if (menu_btn.button_fired && !(draggable && slider_value_changed_during_interaction))
-                g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
+            if (menu_btn.button_fired && !(draggable && slider_value_changed_during_interaction)) {
+                if (GuiIo().in.modifiers.Get(ModifierKey::Modifier))
+                    new_val = param.DefaultLinearValue();
+                else
+                    g.builder.imgui.OpenPopupMenu(popup_id, menu_btn.imgui_id);
+            }
 
             if (new_val) SetParameterValue(g.engine.processor, param.info.index, *new_val, {});
 

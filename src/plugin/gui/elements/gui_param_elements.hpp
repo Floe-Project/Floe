@@ -155,9 +155,14 @@ constexpr String k_dragger_tooltip_footer =
     "Shift-drag for fine control. " MODIFIER_KEY_NAME
     "-click to reset. Double-click to type. Right-click for more options."_s;
 constexpr String k_right_click_tooltip_footer = "Right-click for more options."_s;
-// For buttons and menus, which only have a right-click menu when automatable.
+// For buttons, which only have a right-click menu when automatable.
 constexpr String ParamClickableTooltipFooter(DescribedParamValue const& param) {
     return param.info.flags.not_automatable ? String {} : k_right_click_tooltip_footer;
+}
+// For menus, which additionally reset to their default value on modifier-click.
+constexpr String ParamMenuTooltipFooter(DescribedParamValue const& param) {
+    if (param.info.flags.not_automatable) return MODIFIER_KEY_NAME "-click to reset."_s;
+    return MODIFIER_KEY_NAME "-click to reset. Right-click for more options."_s;
 }
 
 // Value readout: just the value for a single parameter, "Label: value" lines for several.

@@ -70,14 +70,15 @@ static Optional<String> WaveformTooltipText(ArenaAllocator& arena,
     "hard. "
 
     auto const markers = ({
-        String m = "The red markers are voices, each one tracking through the sample as it plays."_s;
+        String m =
+            "When playing, the red markers are voices, each one tracking through the sample as it plays."_s;
         if (play_mode) switch (*play_mode) {
                 case param_values::PlayMode::Standard: break;
                 case param_values::PlayMode::GranularPlayback:
-                    m = "The red markers are voices. Each one is the point grains are being drawn from, tracking through the sample as it plays. The lilac lines are the individual grains."_s;
+                    m = "When playing, the red markers are voices. Each one is the point grains are being drawn from, tracking through the sample as it plays. The lilac lines are the individual grains."_s;
                     break;
                 case param_values::PlayMode::GranularFixed:
-                    m = "The lilac lines are individual grains. The highlighted region is where they can be drawn from, set by the Position and Spread controls."_s;
+                    m = "When playing, the lilac lines are individual grains. The highlighted region is where they can be drawn from, set by the Position and Spread controls."_s;
                     break;
                 case param_values::PlayMode::Count: PanicIfReached();
             }

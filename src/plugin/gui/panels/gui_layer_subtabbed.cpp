@@ -1346,6 +1346,7 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
     constexpr auto k_control_width = 76;
     constexpr auto k_narrow_control_width = 76;
     constexpr auto k_narrow_control_gap_x = 3;
+    constexpr auto k_wide_control_width = 156;
 
     auto const page = DoBox(g.builder,
                             {
@@ -1478,9 +1479,10 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                   .layout {
                       .size = {k_play_label_width, k_font_body_size},
                   },
+                  .tooltip = FunctionRef<String()> {[&]() -> String { return param.info.tooltip; }},
               });
 
-        DoMenuParameter(g, row, param, {.width = k_control_width, .label = false});
+        DoMenuParameter(g, row, param, {.width = k_wide_control_width, .label = false});
     }
 
     // MPE press/slide routing: summary button that opens a popup editor
@@ -1511,29 +1513,32 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                     .size = {k_play_label_width, k_font_body_size},
                 },
                 .tooltip =
-                    "Route per-note MPE press and slide to destinations on this layer. MPE must be enabled in the Performance Controls panel"_s,
+                    "MIDI Polyphonic Expression (MPE) gives every note its own channel, so a compatible keyboard can shape one note of a chord without touching the rest. Floe always applies per-note pitch bend; press and slide are yours to route here.\n\n"
+                    "MPE has to be switched on in the Performance Controls panel first."_s,
             });
 
         // Like MenuOpenButton, but the summary mixes icon-font and body-font segments.
-        auto const menu_btn =
-            DoBox(g.builder,
-                  {
-                      .parent = row,
-                      .background_fill_colours = LiveColStruct(UiColMap::MidDarkSurface),
-                      .background_fill_auto_hot_active_overlay = true,
-                      .round_background_corners = 0b1111,
-                      .corner_rounding = k_corner_rounding,
-                      .layout {
-                          .size = {156, layout::k_hug_contents},
-                          .contents_padding = {.lr = k_button_padding_x, .tb = k_button_padding_y},
-                          .contents_gap = 4,
-                          .contents_direction = layout::Direction::Row,
-                          .contents_align = layout::Alignment::Justify,
-                          .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                      },
-                      .tooltip = "Configure what MPE press and slide control on this layer"_s,
-                      .button_behaviour = imgui::ButtonConfig {},
-                  });
+        auto const menu_btn = DoBox(
+            g.builder,
+            {
+                .parent = row,
+                .background_fill_colours = LiveColStruct(UiColMap::MidDarkSurface),
+                .background_fill_auto_hot_active_overlay = true,
+                .round_background_corners = 0b1111,
+                .corner_rounding = k_corner_rounding,
+                .layout {
+                    .size = {k_wide_control_width, layout::k_hug_contents},
+                    .contents_padding = {.lr = k_button_padding_x, .tb = k_button_padding_y},
+                    .contents_gap = 4,
+                    .contents_direction = layout::Direction::Row,
+                    .contents_align = layout::Alignment::Justify,
+                    .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                },
+                .tooltip =
+                    "Open this layer's press and slide routing. The summary shows what each is set to: the target icon is press, the up-down arrow is slide.\n\n"
+                    "This needs a MIDI Polyphonic Expression (MPE) keyboard, and MPE switched on in the Performance Controls panel."_s,
+                .button_behaviour = imgui::ButtonConfig {},
+            });
 
         auto const summary_colours = ColSet {
             .base = LiveColStruct(UiColMap::MidText),
@@ -1834,13 +1839,14 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
         DoBox(g.builder,
               {
                   .parent = row,
-                  .text = "Range"_s,
+                  .text = "Key Range"_s,
                   .text_colours = LiveColStruct(UiColMap::MidText),
                   .text_justification = TextJustification::CentredRight,
                   .layout {
                       .size = {k_play_label_width, k_font_body_size},
                       .margins {.r = k_page_row_gap_x - k_narrow_control_gap_x},
                   },
+                  .tooltip = params.DescribedValue(layer_index, LayerParamIndex::KeyRangeLow).info.tooltip,
               });
 
         DoIntParameter(g,
@@ -1875,17 +1881,19 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                                    },
                                });
 
-        DoBox(g.builder,
-              {
-                  .parent = row,
-                  .text = "Key Fade"_s,
-                  .text_colours = LiveColStruct(UiColMap::MidText),
-                  .text_justification = TextJustification::CentredRight,
-                  .layout {
-                      .size = {k_play_label_width, k_font_body_size},
-                      .margins {.r = k_page_row_gap_x - k_narrow_control_gap_x},
-                  },
-              });
+        DoBox(
+            g.builder,
+            {
+                .parent = row,
+                .text = "Key Fade"_s,
+                .text_colours = LiveColStruct(UiColMap::MidText),
+                .text_justification = TextJustification::CentredRight,
+                .layout {
+                    .size = {k_play_label_width, k_font_body_size},
+                    .margins {.r = k_page_row_gap_x - k_narrow_control_gap_x},
+                },
+                .tooltip = params.DescribedValue(layer_index, LayerParamIndex::KeyRangeLowFade).info.tooltip,
+            });
 
         DoIntParameter(g,
                        row,
@@ -1906,6 +1914,11 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
 
     // Velocity curve
     {
+        constexpr String k_velocity_curve_tooltip =
+            "This curve turns how hard you play into how loud each note sounds: velocity runs left to right, the volume it produces bottom to top. Steepen it for a wider dynamic range, or flatten it to even your playing out.\n\n"
+            "Play a note and a red line appears on the curve: how far across it sits is the velocity you played, and how tall it stands is the volume you get.\n\n"
+            "The curve doesn't affect which samples a multi-sampled Instrument plays.";
+
         auto const col = DoBox(g.builder,
                                {
                                    .parent = page,
@@ -1928,9 +1941,7 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                   .layout {
                       .size = {layout::k_fill_parent, k_font_body_size},
                   },
-                  .tooltip = FunctionRef<String()> {[&]() -> String {
-                      return "Curve that maps velocity to volume"_s;
-                  }},
+                  .tooltip = k_velocity_curve_tooltip,
               });
 
         // Element
@@ -1951,13 +1962,12 @@ static void DoConfigPage(GuiState& g, u8 layer_index, Box parent) {
                 velocity =
                     g.engine.processor.voice_pool.last_velocity[layer_index].Load(LoadMemoryOrder::Relaxed);
 
-            DoCurveMap(
-                g,
-                layer.velocity_curve_map,
-                layer_index,
-                window_r,
-                velocity,
-                "Configures how MIDI velocity maps to volume. X-axis: velocity, Y-axis: volume. Adjust the curve to customize this relationship.");
+            DoCurveMap(g,
+                       layer.velocity_curve_map,
+                       layer_index,
+                       window_r,
+                       velocity,
+                       k_velocity_curve_tooltip);
         }
     }
 }
@@ -2761,6 +2771,7 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
 
     auto const do_int_dragger_cell = [&](Box control_row,
                                          String label,
+                                         String tooltip,
                                          int current,
                                          int min_val,
                                          int max_val,
@@ -2780,6 +2791,10 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
                       .text_justification = TextJustification::CentredLeft,
                       .text_overflow = TextOverflowType::AllowOverflow,
                       .layout {.size = {layout::k_fill_parent, k_mid_button_height}},
+                      .tooltip = tooltip,
+                      .tooltip_footer = "Shift-drag for fine control. " MODIFIER_KEY_NAME
+                                        "-click to reset. Double-click to type."_s,
+                      .tooltip_avoid_box = &cell,
                   });
 
         Optional<int> new_val {};
@@ -2860,20 +2875,22 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
             auto const cell = do_cell(row);
             auto const synced = arp_state.resolved_rate_for_gui.Load(LoadMemoryOrder::Relaxed);
             auto const rate_text = param_values::k_arp_synced_rate_strings[ToInt(synced)];
-            DoBox(g.builder,
-                  {
-                      .parent = cell,
-                      .text = rate_text,
-                      .text_colours =
-                          LiveColStruct(secondary_greyed ? UiColMap::MidTextDimmed : UiColMap::MidText),
-                      .text_justification = TextJustification::Centred,
-                      .background_fill_colours = LiveColStruct(UiColMap::MidDarkSurface),
-                      .round_background_corners = 0b1111,
-                      .corner_rounding = k_corner_rounding,
-                      .layout {.size = {k_control_width, k_mid_button_height}},
-                      .tooltip = "Rate set automatically by Auto Rate"_s,
-                      .tooltip_avoid_box = &cell,
-                  });
+            DoBox(
+                g.builder,
+                {
+                    .parent = cell,
+                    .text = rate_text,
+                    .text_colours =
+                        LiveColStruct(secondary_greyed ? UiColMap::MidTextDimmed : UiColMap::MidText),
+                    .text_justification = TextJustification::Centred,
+                    .background_fill_colours = LiveColStruct(UiColMap::MidDarkSurface),
+                    .round_background_corners = 0b1111,
+                    .corner_rounding = k_corner_rounding,
+                    .layout {.size = {k_control_width, k_mid_button_height}},
+                    .tooltip =
+                        "The step rate Floe has chosen for this sliced Instrument, based on the loop's own recorded speed and your host tempo. Set Auto Rate to Off if you'd rather pick the rate yourself."_s,
+                    .tooltip_avoid_box = &cell,
+                });
             do_label(cell, "Rate"_s, secondary_greyed);
         } else {
             do_menu_cell(row, LayerParamIndex::ArpRate, secondary_greyed, true);
@@ -2925,18 +2942,21 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
             auto const is_recording = !secondary_greyed && arp_state.recording.Load(LoadMemoryOrder::Relaxed);
 
             auto const cell = do_cell(row);
-            auto const rec_btn = DoBox(g.builder,
-                                       {
-                                           .parent = cell,
-                                           .layout {
-                                               .size = {k_control_width, k_mid_button_height},
-                                               .contents_align = layout::Alignment::Middle,
-                                               .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                                           },
-                                           .tooltip = "Record a fixed note sequence by playing keys"_s,
-                                           .tooltip_avoid_box = &cell,
-                                           .button_behaviour = imgui::ButtonConfig {},
-                                       });
+            auto const rec_btn = DoBox(
+                g.builder,
+                {
+                    .parent = cell,
+                    .layout {
+                        .size = {k_control_width, k_mid_button_height},
+                        .contents_align = layout::Alignment::Middle,
+                        .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                    },
+                    .tooltip =
+                        "Fill the Fixed Notes sequence by playing it in. Click to start recording, then play on your keyboard: each note you press lands on the next step, and recording stops by itself once the last step is filled. Click again to stop early.\n\n"
+                        "Only the notes are recorded — each step keeps the velocity, gate and tie you've already set."_s,
+                    .tooltip_avoid_box = &cell,
+                    .button_behaviour = imgui::ButtonConfig {},
+                });
 
             if (auto const r = BoxRect(g.builder, rec_btn)) {
                 auto const window_r = g.imgui.ViewportRectToWindowRect(*r);
@@ -2974,13 +2994,15 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
         }
         if (num_slices > 1) {
             auto const offset_current = (int)arp_state.slice_start_offset.Load(LoadMemoryOrder::Relaxed);
-            auto const offset_new = do_int_dragger_cell(row,
-                                                        "Offset"_s,
-                                                        offset_current,
-                                                        0,
-                                                        (int)Min(num_slices - 1, (u32)255),
-                                                        fmt::Format(g.scratch_arena, "{}", offset_current),
-                                                        secondary_greyed);
+            auto const offset_new = do_int_dragger_cell(
+                row,
+                "Offset"_s,
+                "Offset picks which of the Instrument's slices the pattern starts from, so you can begin part-way into the loop. Shifting the start is an easy way to get a fresh groove out of a familiar loop."_s,
+                offset_current,
+                0,
+                (int)Min(num_slices - 1, (u32)255),
+                fmt::Format(g.scratch_arena, "{}", offset_current),
+                secondary_greyed);
             if (offset_new && !secondary_greyed)
                 arp_state.slice_start_offset.Store((u8)*offset_new, StoreMemoryOrder::Relaxed);
 
@@ -2988,6 +3010,8 @@ static void DoArpPage(GuiState& g, u8 layer_index, Box parent) {
             auto const length_new = do_int_dragger_cell(
                 row,
                 "Length"_s,
+                "Length sets how many slices play before the pattern loops back to the Offset, counting from the offset onwards and wrapping round the end if it needs to. Set it to All to play every slice.\n\n"
+                "Looping a short run of slices is how you turn a long loop into a tight, repeating figure."_s,
                 length_current,
                 0,
                 (int)Min(num_slices, (u32)255),

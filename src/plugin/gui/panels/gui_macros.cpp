@@ -29,31 +29,6 @@ static void DrawLinkLine(GuiState& g, f32x2 p1, f32x2 p2) {
                                        Max(1.0f, WwToPixels(2.0f)));
 }
 
-static void DrawPopupTextbox(GuiState& g, String str, Rect r) {
-    auto const size = g.fonts.CalcTextSize(str, {});
-    auto const pad = WwToPixels(k_tooltip_pad);
-
-    r = r.Expanded(WwToPixels(4.0f));
-
-    Rect popup_r;
-    popup_r.x = r.x + (r.w / 2) - (size.x / 2 + pad.x);
-    popup_r.y = r.y + r.h;
-    popup_r.size = size + pad * 2;
-
-    popup_r.pos = imgui::BestPopupPos(popup_r,
-                                      r,
-                                      GuiIo().in.window_size.ToFloat2(),
-                                      imgui::PopupJustification::AboveOrBelow);
-
-    auto const text_start = popup_r.pos + pad;
-
-    DrawDropShadow(g.builder.imgui, popup_r);
-    g.builder.imgui.overlay_draw_list->AddRectFilled(popup_r,
-                                                     ToU32({.c = Col::Background0}),
-                                                     WwToPixels(k_corner_rounding));
-    g.builder.imgui.overlay_draw_list->AddText(text_start, ToU32({.c = Col::Text}), str);
-}
-
 void DoMacrosEditGui(GuiState& g, Box const& parent) {
     auto& builder = g.builder;
 
@@ -384,19 +359,24 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
                 if (dest_text_input_result)
                     DrawParameterTextInput(builder.imgui, knob_r, *dest_text_input_result);
 
-                if (builder.imgui.IsHotOrActive(imgui_id, MouseButton::Left)) {
-                    dyn::Append(g.macros_gui_state.draw_overlays, [&dest, r = knob_r](GuiState& g) {
-                        auto const& descriptor = k_param_descriptors[ToInt(*dest.param_index)];
-                        auto const str =
-                            fmt::Format(g.builder.arena,
-                                        "{}\n{}\n{.0}%{}",
-                                        descriptor.gui_label,
-                                        descriptor.ModuleString(" › "_s),
-                                        dest.ProjectedValue() * 100,
-                                        descriptor.flags.legacy ? "\n(legacy parameter)"_s : ""_s);
-                        DrawPopupTextbox(g, str, r);
+                Tooltip(
+                    g,
+                    imgui_id,
+                    knob_r,
+                    {
+                        .value_popup = FunctionRef<String()> {[&]() -> String {
+                            auto const& descriptor = k_param_descriptors[ToInt(*dest.param_index)];
+                            return fmt::Format(builder.arena,
+                                               "{}\n{}\n{.0}%{}",
+                                               descriptor.gui_label,
+                                               descriptor.ModuleString(" › "_s),
+                                               dest.ProjectedValue() * 100,
+                                               descriptor.flags.legacy ? "\n(legacy parameter)"_s : ""_s);
+                        }},
+                        .tooltip =
+                            "This sets how far the macro moves the parameter it's linked to. At 100% the parameter sweeps up by its whole range as you turn the macro up, and negative amounts sweep it down instead.\n\nRest the cursor here for a moment to find the parameter itself: Floe draws a line to it and scrolls it into view."_s,
+                        .tooltip_footer = "Double-click to type an amount. Right-click for more options."_s,
                     });
-                }
 
                 if (k_param_descriptors[ToInt(*dest.param_index)].flags.legacy) {
                     auto const badge_size = knob_r.w * 0.55f;
@@ -470,6 +450,15 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
                 };
 
                 auto const imgui_id = builder.imgui.MakeId("add-destination-button"_s);
+
+                Tooltip(
+                    g,
+                    imgui_id,
+                    knob_r,
+                    {
+                        .tooltip =
+                            "Click to link another parameter to this macro. Floe marks every parameter you can choose with a plus icon; click one to connect it, or press Escape to cancel.\n\nA macro can control up to six parameters at once."_s,
+                    });
 
                 if (builder.imgui.ButtonBehaviour(knob_r,
                                                   imgui_id,
@@ -545,13 +534,16 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
             }
         }
 
-        auto const name_input = DoBox(builder,
-                                      {
-                                          .parent = container,
-                                          .layout {
-                                              .size = {100, k_font_body_size + 6},
-                                          },
-                                      });
+        auto const name_input = DoBox(
+            builder,
+            {
+                .parent = container,
+                .layout {
+                    .size = {100, k_font_body_size + 6},
+                },
+                .tooltip =
+                    "Rename the macro to say what it does in this preset, such as Brightness or Swell. The name is saved with the preset and labels the macro knob everywhere it appears."_s,
+            });
 
         if (auto const r = BoxRect(builder, name_input)) {
             auto const window_r = builder.imgui.RegisterAndConvertRect(*r);
@@ -606,6 +598,15 @@ void DoMacrosEditGui(GuiState& g, Box const& parent) {
 
         if (remove_button) {
             auto const r = remove_button->r;
+
+            Tooltip(
+                g,
+                remove_button->id,
+                r,
+                {
+                    .tooltip =
+                        "Unlinks this parameter from the macro. The parameter keeps its own setting — it just stops following the macro."_s,
+                });
 
             if (builder.imgui.ButtonBehaviour(remove_button->r,
                                               remove_button->id,

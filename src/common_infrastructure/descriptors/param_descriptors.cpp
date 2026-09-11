@@ -36,6 +36,10 @@ Optional<String> ParameterMenuItemDescription(ParamIndex param_index, u32 item_i
         }
         case ParamDescriptor::MenuType::MonophonicMode:
             return MonophonicModeDescription((param_values::MonophonicMode)item_index);
+        case ParamDescriptor::MenuType::StereoWidenMode:
+            return StereoWidenModeDescription((param_values::StereoWidenMode)item_index);
+        case ParamDescriptor::MenuType::DelayMode:
+            return DelayModeDescription((param_values::DelayMode)item_index);
         case ParamDescriptor::MenuType::MpeDestination: {
             auto const description = MpeDestinationDescription((param_values::MpeDestination)item_index);
             return description.size ? Optional<String> {description} : k_nullopt;

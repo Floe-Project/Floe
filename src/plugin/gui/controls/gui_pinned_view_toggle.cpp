@@ -43,9 +43,9 @@ void DoPinnedViewToggle(GuiState& g, Box parent) {
             },
             .tooltip =
                 viewing_pinned
-                    ? "You're hearing the original: the preset as it was last loaded or saved. Switch back to Modified to return to your changes.\n\nCareful: editing anything while viewing the original discards your modifications."_s
+                    ? "You're hearing the original: the preset as it was last loaded or saved. Switch back to Modified to return to your changes.\n\nCareful: editing anything while viewing the original discards your modifications, but you can always use the Undo button in the top panel."_s
                 : modified
-                    ? "Flick between your modified version and the original: the preset as it was last loaded or saved. It's an easy way to check whether your changes are actually an improvement.\n\nCareful: editing anything while viewing the original discards your modifications."_s
+                    ? "Flick between your modified version and the original: the preset as it was last loaded or saved. It's an easy way to check whether your changes are actually an improvement.\n\nCareful: editing anything while viewing the original discards your modifications, but you can always use the Undo button in the top panel."_s
                     : "Compare your changes against the preset. Once you've modified something, this lets you flick between the preset as it was last loaded or saved and your modified version, so you can hear exactly what your changes have done."_s,
             .button_behaviour =
                 has_comparison ? Optional<imgui::ButtonConfig> {imgui::ButtonConfig {}} : k_nullopt,

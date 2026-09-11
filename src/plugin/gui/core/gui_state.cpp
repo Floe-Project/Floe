@@ -296,6 +296,16 @@ static void DoResizeCorner(GuiState& g) {
                              r.BottomLeft() + f32x2 {line_gap * 2, 0},
                              line_col);
 
+    Tooltip(g.builder,
+            id,
+            r,
+            {
+                .tooltip = "Resize Floe's window. Floe has a fixed aspect ratio, so the whole interface "
+                           "scales up and down together. You can also change the size in the Preferences."_s,
+                .tooltip_footer = "Drag to resize."_s,
+                .placement = TooltipPlacement::AboveThenBelow,
+            });
+
     imgui.RegisterNamedRect("resize-corner"_s, r);
 }
 

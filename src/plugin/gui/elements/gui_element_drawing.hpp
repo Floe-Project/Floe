@@ -80,6 +80,7 @@ struct DrawPeakMeterOptions {
     // Draws a horizontal line across the channels at this level, e.g. a limiter threshold or ceiling.
     Optional<f32> marker_db {};
     u32 marker_col = 0; // 0 uses the default peak colour.
+    String marker_description {}; // What the line means, for the tooltip. E.g. "Ceiling".
 
     // If the true level is above this but would otherwise be below min_db (and so not drawn at all),
     // draw a 1px sliver at the bottom of the meter to indicate there's still some signal present.

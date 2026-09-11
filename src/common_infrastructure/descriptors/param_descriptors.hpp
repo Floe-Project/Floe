@@ -1059,6 +1059,20 @@ constexpr auto k_delay_mode_strings = ArrayT<String>({
     "Mid ping-pong",
 });
 static_assert(k_delay_mode_strings.size == ToInt(DelayMode::Count));
+constexpr String DelayModeDescription(DelayMode mode) {
+    switch (mode) {
+        case DelayMode::Mono:
+            return "Both channels repeat at the Time L setting, so the echoes sit where the original sound sits in the stereo image. Time R is unused here."_s;
+        case DelayMode::Stereo:
+            return "The left and right channels each get their own delay line, so setting Time L and Time R apart from each other spreads the repeats across the stereo image."_s;
+        case DelayMode::PingPong:
+            return "The sound is summed to the centre and the repeats then bounce from one side to the other, with Time L and Time R setting how long each half of the bounce lasts."_s;
+        case DelayMode::MidPingPong:
+            return "The repeats bounce from side to side as they do in Ping-pong, but the sound keeps its stereo image on the way in."_s;
+        case DelayMode::Count: break;
+    }
+    return {};
+}
 
 enum class VelocityMappingMode : u8 { // never reorder
     None,
@@ -1116,6 +1130,18 @@ constexpr auto k_stereo_widen_mode_strings = ArrayT<String>({
     "Legacy",
 });
 static_assert(k_stereo_widen_mode_strings.size == ToInt(StereoWidenMode::Count));
+constexpr String StereoWidenModeDescription(StereoWidenMode mode) {
+    switch (mode) {
+        case StereoWidenMode::Balanced:
+            return "Rebalances the mid and side signals against each other, keeping the perceived loudness the same wherever Width is set. The one to reach for by default."_s;
+        case StereoWidenMode::BassMono:
+            return "Widens as Balanced does, but sums everything below the Bass Mono frequency to the centre, keeping the low end solid and mono-compatible."_s;
+        case StereoWidenMode::Legacy:
+            return "The widening used by older versions of Floe, kept so that existing presets sound as they always did. It boosts the side signal as Width goes up, so the level rises with it."_s;
+        case StereoWidenMode::Count: break;
+    }
+    return {};
+}
 
 enum class PlayMode : u8 {
     Standard,
@@ -2194,7 +2220,7 @@ consteval auto CreateParams() {
         .name = "Type"_s,
         .gui_label = "Type"_s,
         .tooltip =
-            "The Type decides the character and flavour of the distortion. Some are warmer and saturating while others focus on interesting sound mangling. The modern types keep their loudness steady as the drive is increased; the Legacy types are the original algorithms without that compensation."_s,
+            "The Type sets the character and flavour of the distortion. The Bite types saturate and thicken the sound; the Mangle types tear it apart into something more extreme.\n\nThe Legacy types are the original algorithms from Floe's early days, kept so that older presets still sound as they were made."_s,
     };
     mp(DistortionDrive) = Args {
         .id = id(IdRegion::Master, 4), // never change
@@ -2203,7 +2229,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
         .name = "Drive"_s,
         .gui_label = "Drive"_s,
-        .tooltip = "Distortion amount"_s,
+        .tooltip =
+            "Drive sets how hard the signal is pushed into the Type's shaping curve, and is the main control for how much distortion you hear. For the Mangle types it also moves the effect itself, so the character changes as well as the intensity."_s,
     };
     mp(DistortionMix) = Args {
         .id = id(IdRegion::Master, 115), // never change
@@ -2213,7 +2240,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the distorted signal"_s,
+        .tooltip =
+            "Blend between the dry input and the distorted signal. Backing it off keeps the clarity of the original sound with the distortion sitting underneath it."_s,
     };
     mp(DistortionOn) = Args {
         .id = id(IdRegion::Master, 5), // never change
@@ -2222,7 +2250,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
         .name = "On"_s,
         .gui_label = "Distortion"_s,
-        .tooltip = "Enable/disable the distortion effect"_s,
+        .tooltip = "Enable/disable the distortion effect."_s,
     };
     mp(DistortionPunish) = Args {
         .id = id(IdRegion::Master, 149), // never change
@@ -2233,7 +2261,7 @@ consteval auto CreateParams() {
         .name = "Punish"_s,
         .gui_label = "Punish"_s,
         .tooltip =
-            "Cascade extra distortion stages after the first, like the gain stages of an amplifier. Each added stage is driven harder and biased off-centre, giving a denser, more compressed drive with a warmer, even-harmonic edge and a tighter low end. Drive sets how hard the signal hits the first stage; Punish sets how much is stacked on top"_s,
+            "Punish stacks extra distortion stages after the first, each one driven harder and biased off-centre, for a denser and more compressed edge. Drive sets how hard the signal hits the first stage; Punish sets how much is piled on top."_s,
     };
     mp(DistortionTilt) = Args {
         .id = id(IdRegion::Master, 150), // never change
@@ -2247,7 +2275,7 @@ consteval auto CreateParams() {
         .name = "Tilt EQ"_s,
         .gui_label = "Tilt EQ"_s,
         .tooltip =
-            "Tilt the tone going into the distortion. Positive pushes the highs so they saturate more for a brighter result; negative pushes the lows for a warmer, fatter drive"_s,
+            "Tilt the tone going into the distortion. Positive lifts the highs so they saturate more for a brighter result; negative lifts the lows for a warmer, fatter drive."_s,
     };
     mp(DistortionGain) = Args {
         .id = id(IdRegion::Master, 152), // never change
@@ -2257,7 +2285,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Change the level of the distorted signal - applied after all distortion has happened."_s,
+        .tooltip =
+            "Change the level of the distorted signal, applied after all the shaping and before the Mix blend."_s,
     };
     mp(DistortionAutoGain) = Args {
         .id = id(IdRegion::Master, 148), // never change
@@ -2268,7 +2297,7 @@ consteval auto CreateParams() {
         .name = "Auto Gain"_s,
         .gui_label = "Auto Gain"_s,
         .tooltip =
-            "Keep the output loudness steady as Drive is increased, as the non-Legacy types always do. Older presets load with it off so they sound the same"_s,
+            "Enable Auto Gain to hold this Legacy type's loudness steady as Drive is increased; it's the same compensation that the Bite and Mangle types always use. Presets made before Floe had this switch load with it off, so they sound just as they were made."_s,
     };
 
     // =====================================================================================================
@@ -2279,7 +2308,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Bitcrush},
         .name = "Bits"_s,
         .gui_label = "Bits"_s,
-        .tooltip = "Audio resolution"_s,
+        .tooltip =
+            "Reduce the bit depth of the signal, adding a gritty digital noise that's most obvious in quiet passages and tails."_s,
     };
     mp(BitCrushBitRate) = Args {
         .id = id(IdRegion::Master, 7), // never change
@@ -2292,7 +2322,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Bitcrush},
         .name = "Sample Rate"_s,
         .gui_label = "Samp Rate"_s,
-        .tooltip = "Sample rate"_s,
+        .tooltip =
+            "Reduce the sample rate by holding each sample for longer. Lower rates fold high frequencies back down into ringing, metallic aliasing - the sound of early samplers and retro hardware."_s,
     };
     mp(LegacyBitCrushWet) = Args {
         .id = id(IdRegion::Master, 8), // never change
@@ -2322,7 +2353,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Bitcrush},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the bitcrushed signal"_s,
+        .tooltip = "Blend between the dry input and the bitcrushed signal."_s,
     };
     mp(BitCrushOutput) = Args {
         .id = id(IdRegion::Master, 110), // never change
@@ -2332,7 +2363,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Bitcrush},
         .name = "Output"_s,
         .gui_label = "Output"_s,
-        .tooltip = "Output level after the mix"_s,
+        .tooltip = "Output level after the mix."_s,
     };
     mp(BitCrushOn) = Args {
         .id = id(IdRegion::Master, 10), // never change
@@ -2341,7 +2372,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Bitcrush},
         .name = "On"_s,
         .gui_label = "Bit Crush"_s,
-        .tooltip = "Enable/disable the bitcrush effect"_s,
+        .tooltip = "Enable/disable the bitcrush effect."_s,
     };
 
     // =====================================================================================================
@@ -2370,7 +2401,7 @@ consteval auto CreateParams() {
         .name = "Threshold"_s,
         .gui_label = "Threshold"_s,
         .tooltip =
-            "The threshold that the audio has to pass above before the compression should start taking place"_s,
+            "The threshold that the audio has to pass above before the compression should start taking place."_s,
     };
     mp(LegacyCompressorRatio) = Args {
         .id = id(IdRegion::Master, 12), // never change
@@ -2402,7 +2433,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Ratio"_s,
         .gui_label = "Ratio"_s,
-        .tooltip = "The intensity of compression (high ratios mean more compression)"_s,
+        .tooltip =
+            "The intensity of compression (high ratios mean more compression). Above around 2:1 begins to make the pumping effect much more noticable."_s,
     };
     mp(CompressorGain) = Args {
         .id = id(IdRegion::Master, 13), // never change
@@ -2411,7 +2443,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Additional control for volume after compression"_s,
+        .tooltip = "An additional control for volume after compression."_s,
     };
     mp(CompressorAutoGain) = Args {
         .id = id(IdRegion::Master, 14), // never change
@@ -2421,7 +2453,7 @@ consteval auto CreateParams() {
         .name = "Auto Gain"_s,
         .gui_label = "Auto Gain"_s,
         .tooltip =
-            "Automatically re-adjust the gain to stay consistent regardless of compression intensity"_s,
+            "Automatically re-adjust the gain to stay consistent regardless of compression intensity."_s,
     };
     mp(CompressorOn) = Args {
         .id = id(IdRegion::Master, 15), // never change
@@ -2430,7 +2462,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "On"_s,
         .gui_label = "Compressor",
-        .tooltip = "Enable/disable the compression effect"_s,
+        .tooltip = "Enable/disable the compression effect."_s,
     };
     mp(CompressorType) = Args {
         .id = id(IdRegion::Master, 33), // never change
@@ -2443,7 +2475,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "The compressor algorithm to use"_s,
+        .tooltip =
+            "The compressor algorithm to use. The Vintage type has a bit of character, and automatically set the attack and release. The Digital type offers more precision."_s,
     };
     mp(CompressorAttack) = Args {
         .id = id(IdRegion::Master, 34), // never change
@@ -2456,7 +2489,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Attack"_s,
         .gui_label = "Attack"_s,
-        .tooltip = "How quickly the compressor responds to a rise in level"_s,
+        .tooltip = "How quickly the compressor responds to a rise in level."_s,
     };
     mp(CompressorRelease) = Args {
         .id = id(IdRegion::Master, 35), // never change
@@ -2469,7 +2502,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Release"_s,
         .gui_label = "Release"_s,
-        .tooltip = "How quickly the compressor recovers after the level drops"_s,
+        .tooltip = "How quickly the compressor recovers after the level drops."_s,
     };
     mp(CompressorMix) = Args {
         .id = id(IdRegion::Master, 36), // never change
@@ -2479,7 +2512,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Compressor},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the compressed signal"_s,
+        .tooltip = "Blend between the dry input and the compressed signal."_s,
     };
 
     // =====================================================================================================
@@ -2490,7 +2523,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "On"_s,
         .gui_label = "Filter"_s,
-        .tooltip = "Enable/disable the filter"_s,
+        .tooltip = "Enable/disable the Filter effect."_s,
     };
     mp(LegacyFilterCutoff) = Args {
         .id = id(IdRegion::Master, 17), // never change
@@ -2510,7 +2543,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "Cutoff Frequency"_s,
         .gui_label = "Cutoff"_s,
-        .tooltip = "Frequency of filter effect"_s,
+        .tooltip =
+            "Cutoff sets where the filter does its work: the point the pass filters roll off from, the centre of the band for Band-pass and Notch, or the corner for the shelves."_s,
         .flags = {.cutoff_frequency = true},
     };
     mp(LegacyFilterResonance) = Args {
@@ -2531,7 +2565,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "Resonance"_s,
         .gui_label = "Reso"_s,
-        .tooltip = "The intensity of the volume peak at the cutoff frequency"_s,
+        .tooltip =
+            "Resonance emphasises the frequencies right at the cutoff, adding a peak there on the pass filters. For Band-pass and Notch it narrows the band, for Peak it tightens the boost, and for the shelves it steepens the corner."_s,
     };
     mp(LegacyFilterGain) = Args {
         .id = id(IdRegion::Master, 19), // never change
@@ -2551,7 +2586,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Volume gain of shelf/peak filter"_s,
+        .tooltip = "Gain sets how far the Peak and shelf types boost or cut around the cutoff."_s,
     };
     mp(LegacyFilterType) = Args {
         .id = id(IdRegion::Master, 20), // never change
@@ -2577,7 +2612,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "Filter type"_s,
+        .tooltip =
+            "Select the filter type. Peak, Low-shelf and High-shelf bring in the Gain knob, letting you boost as well as cut."_s,
     };
     mp(FilterMix) = Args {
         .id = id(IdRegion::Master, 117), // never change
@@ -2587,7 +2623,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the filtered signal"_s,
+        .tooltip = "Blend between the dry input and the filtered signal."_s,
     };
 
     // =====================================================================================================
@@ -2601,7 +2637,10 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::StereoWiden},
         .name = "Width"_s,
         .gui_label = "Width"_s,
-        .tooltip = "Increase or decrease the stereo width"_s,
+        .tooltip =
+            "Width narrows or widens the stereo image. Negative values pull the sound towards mono, positive values push it wider, and 0% leaves it as it is.\n\n"
+            "It rebalances the mid (what both channels share) against the side (what differs between them), so at -100% only the mid is left, and at +100% only the side, which makes anything dead centre disappear.\n\n"
+            "Tip: each layer has its own Stereo control if you want to widen just one of them."_s,
     };
     mp(StereoWidenOn) = Args {
         .id = id(IdRegion::Master, 22), // never change
@@ -2624,7 +2663,7 @@ consteval auto CreateParams() {
         .name = "Mode"_s,
         .gui_label = "Mode"_s,
         .tooltip =
-            "Stereo widening algorithm: Balanced (constant-power M/S), Legacy (original behaviour, kept for old presets), or Bass Mono (mono below the crossover, widened above)"_s,
+            "Mode sets how the widening is done. Hover over the options in the menu for a description of each."_s,
     };
     mp(StereoWidenBassMono) = Args {
         .id = id(IdRegion::Master, 32), // never change
@@ -2639,7 +2678,9 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::StereoWiden},
         .name = "Bass Mono"_s,
         .gui_label = "Bass Mono"_s,
-        .tooltip = "Frequencies below this point are summed to mono (Bass Mono mode only)"_s,
+        .tooltip =
+            "Bass Mono sets the point below which the sound is summed to the centre. Holding the low end in the middle keeps kicks and basslines solid, and stops them losing power on mono systems.\n\n"
+            "The two bands are split with a 24 dB per octave Linkwitz-Riley crossover, so they recombine without a dip around the crossover point."_s,
     };
     mp(StereoWidenMix) = Args {
         .id = id(IdRegion::Master, 116), // never change
@@ -2649,7 +2690,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::StereoWiden},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the stereo-widened signal"_s,
+        .tooltip = "Blend between the dry input and the stereo-widened signal."_s,
     };
 
     // =====================================================================================================
@@ -2660,7 +2701,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "Rate"_s,
         .gui_label = "Rate"_s,
-        .tooltip = "Chorus modulation rate"_s,
+        .tooltip =
+            "The Rate sets how quickly the pitch drifts up and down. Slow rates give a gentle swelling movement, while faster rates become a shimmering warble."_s,
     };
     mp(LegacyChorusHighpass) = Args {
         .id = id(IdRegion::Master, 24), // never change
@@ -2680,7 +2722,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "High-pass"_s,
         .gui_label = "High-pass"_s,
-        .tooltip = "High-pass filter cutoff"_s,
+        .tooltip =
+            "Remove low frequencies from the chorused copies. The dry signal keeps its full low end, so raise this to hold the bass tight and centred while the higher frequencies shimmer."_s,
         .flags = {.cutoff_frequency = true},
     };
     mp(ChorusDepth) = Args {
@@ -2690,7 +2733,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "Depth"_s,
         .gui_label = "Depth"_s,
-        .tooltip = "Chorus effect intensity"_s,
+        .tooltip =
+            "The Depth sets how far the pitch drifts away from the original. Small amounts thicken the sound, while larger amounts give an obvious, tape-like wobble. At zero, the delayed copies are still there, adding a static colouration."_s,
     };
     mp(LegacyChorusWet) = Args {
         .id = id(IdRegion::Master, 26), // never change
@@ -2720,7 +2764,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the chorused signal"_s,
+        .tooltip = "Blend between the dry input and the chorused signal."_s,
     };
     mp(ChorusOutput) = Args {
         .id = id(IdRegion::Master, 112), // never change
@@ -2730,7 +2774,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "Output"_s,
         .gui_label = "Output"_s,
-        .tooltip = "Output level after the mix"_s,
+        .tooltip = "Output level after the mix."_s,
     };
     mp(ChorusOn) = Args {
         .id = id(IdRegion::Master, 28), // never change
@@ -2739,7 +2783,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Chorus},
         .name = "On"_s,
         .gui_label = "Chorus"_s,
-        .tooltip = "Enable/disable the chorus effect"_s,
+        .tooltip = "Enable/disable the chorus effect."_s,
     };
 
     // =====================================================================================================
@@ -2753,7 +2797,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Mode"_s,
         .gui_label = "Mode"_s,
-        .tooltip = "Delay type"_s,
+        .tooltip =
+            "Mode sets how the repeats move around the stereo image. Hover over the options in the menu for a description of each."_s,
     };
 
     mp(DelayFilterCutoffSemitones) = Args {
@@ -2763,7 +2808,9 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Filter Cutoff"_s,
         .gui_label = "Filter"_s,
-        .tooltip = "High/low frequency reduction"_s,
+        .tooltip =
+            "Filter sets the centre of a band-pass that the repeats run through, with Spread setting how wide that band is. The dry signal is left untouched.\n\n"
+            "It sits inside the feedback loop, so every repeat is filtered again and the echoes thin out as they fade."_s,
         .flags = {.cutoff_frequency = true},
     };
 
@@ -2774,7 +2821,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Filter Spread"_s,
         .gui_label = "Spread"_s,
-        .tooltip = "Width of the filter"_s,
+        .tooltip =
+            "Spread sets how wide the repeats' filter band is. Wide open leaves them close to the original sound; narrowed, they squeeze towards the Filter frequency, losing a little more of the top and bottom ends with every pass."_s,
     };
     mp(DelayTimeLMs) = Args {
         .id = id(IdRegion::Master, 93), // never change
@@ -2783,7 +2831,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Time Left (ms)"_s,
         .gui_label = "Time L"_s,
-        .tooltip = "Left delay time (in milliseconds)"_s,
+        .tooltip =
+            "The gap between the repeats in the left channel, set freely in milliseconds.\n\nTip: very short times stop sounding like separate echoes and become a metallic, resonant tone instead."_s,
     };
     mp(DelayTimeRMs) = Args {
         .id = id(IdRegion::Master, 94), // never change
@@ -2792,7 +2841,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Legacy Time Right (ms)"_s,
         .gui_label = "Time R"_s,
-        .tooltip = "Right delay time (in milliseconds)"_s,
+        .tooltip =
+            "The gap between the repeats in the right channel, set freely in milliseconds. It's unused in Mono mode, where both channels follow Time L."_s,
     };
     mp(LegacyDelayTimeSyncedL) = Args {
         .id = id(IdRegion::Master, 95), // never change
@@ -2831,7 +2881,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Time Left (Tempo Synced)"_s,
         .gui_label = "Time L"_s,
-        .tooltip = "Left delay time (synced to the host tempo)"_s,
+        .tooltip =
+            "The gap between the repeats in the left channel, as a note length that follows the host's tempo."_s,
     };
     mp(DelayTimeSyncedR) = Args {
         .id = id(IdRegion::Master, 147), // never change
@@ -2844,7 +2895,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Time Right (Tempo Synced)"_s,
         .gui_label = "Time R"_s,
-        .tooltip = "Right delay time (synced to the host tempo)"_s,
+        .tooltip =
+            "The gap between the repeats in the right channel, as a note length that follows the host's tempo. It's unused in Mono mode, where both channels follow Time L."_s,
     };
     mp(DelayTimeSyncSwitch) = Args {
         .id = id(IdRegion::Master, 97), // never change
@@ -2853,7 +2905,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "On"_s,
         .gui_label = "Tempo Sync"_s,
-        .tooltip = "Synchronise timings to the host's BPM"_s,
+        .tooltip =
+            "Enable Tempo Sync to set the delay times as note lengths that follow the host's tempo, keeping the repeats in time with your track. With it off, the times are dialled in freely in milliseconds."_s,
     };
     mp(DelayMix) = Args {
         .id = id(IdRegion::Master, 98), // never change
@@ -2862,7 +2915,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Level of processed signal"_s,
+        .tooltip = "Blend between the dry input and the delayed signal."_s,
     };
     mp(DelayOn) = Args {
         .id = id(IdRegion::Master, 99), // never change
@@ -2871,7 +2924,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "On"_s,
         .gui_label = "Delay"_s,
-        .tooltip = "Enable/disable the delay effect"_s,
+        .tooltip = "Enable/disable the delay effect."_s,
     };
     mp(DelayFeedback) = Args {
         .id = id(IdRegion::Master, 100), // never change
@@ -2880,7 +2933,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Feedback"_s,
         .gui_label = "Feedback"_s,
-        .tooltip = "How much the signal repeats"_s,
+        .tooltip =
+            "Feedback sets how long the echoes trail on for: low amounts give a handful of repeats, while high amounts carry on long after the note has gone. It works by feeding each repeat back in to make the next one."_s,
     };
 
     // =====================================================================================================
@@ -2891,7 +2945,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Feedback"_s,
         .gui_label = "Feedback"_s,
-        .tooltip = "Feedback amount"_s,
+        .tooltip =
+            "Feedback routes the phased signal back into the filters, sharpening the peaks and deepening the notches. Small amounts keep it as a gentle swoosh, while higher amounts give the sweep a resonant, whistling edge."_s,
         .related_params_group = 1,
     };
     mp(PhaserModFreqHz) = Args {
@@ -2905,7 +2960,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Mod Rate"_s,
         .gui_label = "Rate"_s,
-        .tooltip = "Speed at which the phaser filters modulate"_s,
+        .tooltip =
+            "The Rate sets how quickly the peaks sweep up and down the frequency range. Slow rates give a gentle, drifting movement, while faster rates turn the sweep into a warble."_s,
         .related_params_group = 3,
     };
     mp(PhaserCenterSemitones) = Args {
@@ -2918,7 +2974,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Center Frequency"_s,
         .gui_label = "Freq"_s,
-        .tooltip = "Center frequency of the phaser filters"_s,
+        .tooltip =
+            "Freq sets the centre of the sweep: the frequency that the peaks and notches travel around. Keep it low for a deep, throaty movement, or raise it to place the phasing amongst the brighter harmonics."_s,
         .related_params_group = 0,
         .flags = {.cutoff_frequency = true},
     };
@@ -2929,7 +2986,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Shape"_s,
         .gui_label = "Shape"_s,
-        .tooltip = "Shape of the phaser filter's peaks"_s,
+        .tooltip =
+            "Shape sets how many peaks and notches are carved into the sound. Turned down there's a single broad one for a soft, vowel-like sweep; turned up there are more of them stacked up the spectrum for a richer, more obvious phasing."_s,
         .related_params_group = 2,
     };
     mp(PhaserModDepth) = Args {
@@ -2939,7 +2997,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Mod Depth"_s,
         .gui_label = "Depth"_s,
-        .tooltip = "The range over which the phaser filters modulate"_s,
+        .tooltip =
+            "The Depth sets how far the peaks travel either side of the Freq setting. Small amounts give a narrow, shimmering movement, while larger amounts sweep across the whole spectrum.\n\nTip: with Depth all the way down the peaks hold still, leaving a fixed colouration that you can sweep by hand with Freq."_s,
         .related_params_group = 3,
     };
     mp(PhaserStereoAmount) = Args {
@@ -2949,7 +3008,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Stereo Amount"_s,
         .gui_label = "Stereo"_s,
-        .tooltip = "Adds a stereo effect by offsetting the left and right filters"_s,
+        .tooltip =
+            "Stereo offsets the left and right sweeps from each other so the movement drifts across the stereo image. At zero both channels sweep together; at maximum they sweep in opposite directions, for a wide, swirling feel."_s,
         .related_params_group = 4,
     };
     mp(PhaserMix) = Args {
@@ -2959,7 +3019,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Mix between the wet and dry signals"_s,
+        .tooltip = "Blend between the dry input and the phased signal."_s,
         .related_params_group = 5,
     };
     mp(PhaserOn) = Args {
@@ -2969,10 +3029,22 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "On"_s,
         .gui_label = "Phaser"_s,
-        .tooltip = "Enable/disable the phaser effect"_s,
+        .tooltip = "Enable/disable the phaser effect."_s,
     };
 
     // =====================================================================================================
+    // Shared with each layer's EQ, which has the same bands and types.
+    constexpr String k_eq_type_tooltip =
+        "Choose the shape of this band: a peak or shelf for boosting and cutting, a notch for removing a narrow slice, or a pass filter for rolling off one end of the spectrum.\n\n"
+        "Only the Peak, Low-shelf and High-shelf types use the Gain knob; with the others it's inactive.";
+    constexpr String k_eq_freq_tooltip =
+        "Frequency sets where this band does its work: the centre of a peak or notch, the corner of a shelf, or the cutoff of a pass filter.";
+    constexpr String k_eq_resonance_tooltip =
+        "Resonance sets how tightly the band is focused. For the Peak and Notch types it's the width, going from broad and gentle to tight and focused. The shelves use it to steepen the transition at their corner, and the pass filters use it to add a peak at the cutoff.";
+    constexpr String k_eq_gain_tooltip =
+        "Gain sets how far this band boosts or cuts at its frequency.\n\n"
+        "Only the Peak, Low-shelf and High-shelf types use Gain. The notch and pass filters always cut by their own fixed shape, so with those the knob is inactive.";
+
     mp(EqOn) = Args {
         .id = id(IdRegion::Master, 120), // never change
         .id_string = "fx.eq.on"_s,
@@ -2981,7 +3053,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq},
         .name = "On"_s,
         .gui_label = "EQ"_s,
-        .tooltip = "Enable/disable the equaliser effect"_s,
+        .tooltip = "Enable/disable the EQ effect."_s,
     };
     mp(EqMix) = Args {
         .id = id(IdRegion::Master, 121), // never change
@@ -2991,7 +3063,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Mix between the wet and dry signals"_s,
+        .tooltip = "Blend between the dry input and the equalised signal."_s,
     };
     mp(EqType1) = Args {
         .id = id(IdRegion::Master, 122), // never change
@@ -3002,7 +3074,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band1},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "Band 1: type of EQ band"_s,
+        .tooltip = k_eq_type_tooltip,
     };
     mp(EqFreq1) = Args {
         .id = id(IdRegion::Master, 123), // never change
@@ -3012,7 +3084,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band1},
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
-        .tooltip = "Band 1: frequency of this band"_s,
+        .tooltip = k_eq_freq_tooltip,
         .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance1) = Args {
@@ -3023,7 +3095,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band1},
         .name = "Resonance"_s,
         .gui_label = "Reso"_s,
-        .tooltip = "Band 1: sharpness of the peak"_s,
+        .tooltip = k_eq_resonance_tooltip,
     };
     mp(EqGain1) = Args {
         .id = id(IdRegion::Master, 125), // never change
@@ -3033,7 +3105,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band1},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Band 1: volume gain at the frequency"_s,
+        .tooltip = k_eq_gain_tooltip,
     };
     mp(EqType2) = Args {
         .id = id(IdRegion::Master, 126), // never change
@@ -3044,7 +3116,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band2},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "Band 2: type of EQ band"_s,
+        .tooltip = k_eq_type_tooltip,
     };
     mp(EqFreq2) = Args {
         .id = id(IdRegion::Master, 127), // never change
@@ -3054,7 +3126,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band2},
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
-        .tooltip = "Band 2: frequency of this band"_s,
+        .tooltip = k_eq_freq_tooltip,
         .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance2) = Args {
@@ -3065,7 +3137,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band2},
         .name = "Resonance"_s,
         .gui_label = "Reso"_s,
-        .tooltip = "Band 2: sharpness of the peak"_s,
+        .tooltip = k_eq_resonance_tooltip,
     };
     mp(EqGain2) = Args {
         .id = id(IdRegion::Master, 129), // never change
@@ -3075,7 +3147,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band2},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Band 2: volume gain at the frequency"_s,
+        .tooltip = k_eq_gain_tooltip,
     };
     mp(EqType3) = Args {
         .id = id(IdRegion::Master, 130), // never change
@@ -3086,7 +3158,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band3},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "Band 3: type of EQ band"_s,
+        .tooltip = k_eq_type_tooltip,
     };
     mp(EqFreq3) = Args {
         .id = id(IdRegion::Master, 131), // never change
@@ -3096,7 +3168,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band3},
         .name = "Frequency"_s,
         .gui_label = "Freq"_s,
-        .tooltip = "Band 3: frequency of this band"_s,
+        .tooltip = k_eq_freq_tooltip,
         .flags = {.cutoff_frequency = true},
     };
     mp(EqResonance3) = Args {
@@ -3107,7 +3179,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band3},
         .name = "Resonance"_s,
         .gui_label = "Reso"_s,
-        .tooltip = "Band 3: sharpness of the peak"_s,
+        .tooltip = k_eq_resonance_tooltip,
     };
     mp(EqGain3) = Args {
         .id = id(IdRegion::Master, 133), // never change
@@ -3117,7 +3189,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Eq, ParameterModule::Band3},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Band 3: volume gain at the frequency"_s,
+        .tooltip = k_eq_gain_tooltip,
     };
 
     // =====================================================================================================
@@ -3139,7 +3211,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::ConvolutionReverb},
         .name = "High-pass"_s,
         .gui_label = "High-pass"_s,
-        .tooltip = "Wet high-pass filter cutoff"_s,
+        .tooltip =
+            "Roll off the low end of the reverb, keeping its rumble and boom clear of the dry sound. It applies to the reverb signal alone, before the Mix blend."_s,
         .flags = {.cutoff_frequency = true},
     };
     mp(LegacyConvolutionReverbWet) = Args {
@@ -3170,7 +3243,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::ConvolutionReverb},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the convolution reverb signal"_s,
+        .tooltip = "Blend between the dry input and the reverb signal."_s,
     };
     mp(ConvolutionReverbOutput) = Args {
         .id = id(IdRegion::Master, 114), // never change
@@ -3180,7 +3253,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::ConvolutionReverb},
         .name = "Output"_s,
         .gui_label = "Output"_s,
-        .tooltip = "Output level after the mix"_s,
+        .tooltip = "The effect's output level, applied after the Mix blend."_s,
     };
     mp(ConvolutionReverbOn) = Args {
         .id = id(IdRegion::Master, 68), // never change
@@ -3189,7 +3262,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::ConvolutionReverb},
         .name = "On"_s,
         .gui_label = "Convol Reverb"_s,
-        .tooltip = "Enable/disable the convolution reverb effect"_s,
+        .tooltip = "Enable/disable the Convolution Reverb effect."_s,
     };
 
     // =====================================================================================================
@@ -3203,7 +3276,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Decay Time"_s,
         .gui_label = "Decay"_s,
-        .tooltip = "Reverb decay time"_s,
+        .tooltip =
+            "The Decay Time sets how long the tail takes to fade away once a sound stops. It holds steady whatever the Size, so you can choose the length of the reverb and the character of the space separately."_s,
         .related_params_group = 0,
     };
 
@@ -3214,7 +3288,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Pre Low Cutoff"_s,
         .gui_label = "Pre LP"_s,
-        .tooltip = "Low-pass filter cutoff before reverb"_s,
+        .tooltip =
+            "The Pre LP rolls the highs off the signal on its way into the reverb, for a darker, more distant space. The dry signal keeps its full range."_s,
         .related_params_group = 2,
         .flags = {.cutoff_frequency = true},
     };
@@ -3226,7 +3301,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Pre High Cutoff"_s,
         .gui_label = "Pre HP"_s,
-        .tooltip = "High-pass filter cutoff before reverb"_s,
+        .tooltip =
+            "The Pre HP rolls the lows off the signal on its way into the reverb, keeping the tail clear so the bass stays tight and centred. The dry signal keeps its full range."_s,
         .related_params_group = 2,
         .flags = {.cutoff_frequency = true},
     };
@@ -3238,7 +3314,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Low Cutoff"_s,
         .gui_label = "Lo-Shelf"_s,
-        .tooltip = "Low-pass filter cutoff after reverb"_s,
+        .tooltip =
+            "The Lo-Shelf sets the frequency below which the reverb tail is cut by the Lo-Gain amount. Turn Lo-Gain down to hear it work."_s,
         .related_params_group = 3,
         .flags = {.cutoff_frequency = true},
     };
@@ -3257,7 +3334,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Low Gain"_s,
         .gui_label = "Lo-Gain"_s,
-        .tooltip = "Low-pass filter gain",
+        .tooltip =
+            "The Lo-Gain sets how much the reverb tail is cut below the Lo-Shelf frequency. The cut builds up as the tail recirculates, so the low end thins out as the reverb fades - handy for stopping long tails clouding the bass.",
         .related_params_group = 3,
     };
 
@@ -3268,7 +3346,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "High Cutoff"_s,
         .gui_label = "Hi-Shelf"_s,
-        .tooltip = "High-pass filter cutoff after reverb"_s,
+        .tooltip =
+            "The Hi-Shelf sets the frequency above which the reverb tail is cut by the Hi-Gain amount. Turn Hi-Gain down to hear it work."_s,
         .related_params_group = 4,
         .flags = {.cutoff_frequency = true},
     };
@@ -3280,7 +3359,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "High Gain"_s,
         .gui_label = "Hi-Gain"_s,
-        .tooltip = "High-pass filter gain",
+        .tooltip =
+            "The Hi-Gain sets how much the reverb tail is cut above the Hi-Shelf frequency. The cut builds up as the tail recirculates, so the highs die away first, just as soft furnishings absorb them in a real room.",
         .related_params_group = 4,
     };
 
@@ -3291,7 +3371,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Chorus Amount"_s,
         .gui_label = "Depth"_s,
-        .tooltip = "Chorus effect amount"_s,
+        .tooltip =
+            "The Depth sets how far the reverb's reflections drift, smearing the resonances that build up in the tail. A little stops long tails ringing; more gives an obvious shimmer and movement."_s,
         .related_params_group = 1,
     };
 
@@ -3305,7 +3386,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Chorus Frequency"_s,
         .gui_label = "Mod Rate"_s,
-        .tooltip = "Chorus effect frequency"_s,
+        .tooltip =
+            "The Mod Rate sets how quickly the drift set by Depth moves through the tail. Very slow rates give a gentle, breathing wash, while faster rates add a distinct warble."_s,
         .related_params_group = 1,
     };
 
@@ -3316,7 +3398,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Size"_s,
         .gui_label = "Size"_s,
-        .tooltip = "Reverb size"_s,
+        .tooltip =
+            "The Size scales the spacing of the simulated reflections, setting how large the space feels. Small values pack them together for a boxy, coloured character; large values spread them out for something open and airy."_s,
         .related_params_group = 0,
     };
 
@@ -3330,7 +3413,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Delay"_s,
         .gui_label = "Predelay"_s,
-        .tooltip = "Reverb delay"_s,
+        .tooltip =
+            "The Predelay holds the reverb back for a moment so the dry sound is heard on its own first. Short amounts keep the sound upfront and defined, while longer amounts push the walls further away."_s,
         .related_params_group = 0,
     };
 
@@ -3341,7 +3425,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Processed signal volume"_s,
+        .tooltip = "Blend between the dry input and the reverb signal."_s,
         .related_params_group = 8,
     };
 
@@ -3363,7 +3447,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "On"_s,
         .gui_label = "Limiter"_s,
-        .tooltip = "Enable/disable the limiter effect"_s,
+        .tooltip = "Enable/disable the limiter effect."_s,
     };
     mp(LimiterMix) = Args {
         .id = id(IdRegion::Master, 141), // never change
@@ -3373,7 +3457,7 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "Mix"_s,
         .gui_label = "Mix"_s,
-        .tooltip = "Blend between the dry input and the limited signal"_s,
+        .tooltip = "Blend between the dry input and the limited signal."_s,
     };
     mp(LimiterGain) = Args {
         .id = id(IdRegion::Master, 142), // never change
@@ -3383,7 +3467,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "Gain"_s,
         .gui_label = "Gain"_s,
-        .tooltip = "Drive the signal into the limiter before it is limited"_s,
+        .tooltip =
+            "Boost the level going into the limiter. The harder you push, the more it's limited, making the sound louder and denser."_s,
     };
     mp(LimiterCeiling) = Args {
         .id = id(IdRegion::Master, 143), // never change
@@ -3399,7 +3484,8 @@ consteval auto CreateParams() {
         .modules = {ParameterModule::Effect, ParameterModule::Limiter},
         .name = "Ceiling"_s,
         .gui_label = "Ceiling"_s,
-        .tooltip = "The maximum output level. A small safety margin below 0dB is recommended"_s,
+        .tooltip =
+            "The level the output is never allowed to exceed. Leaving a small margin below 0 dB gives headroom for whatever comes after Floe."_s,
     };
 
     // =====================================================================================================
@@ -3959,17 +4045,6 @@ consteval auto CreateParams() {
         };
 
         // =================================================================================================
-        constexpr String k_eq_type_tooltip =
-            "Choose the shape of this band: a peak or shelf for boosting and cutting, a notch for removing a narrow slice, or a pass filter for rolling off one end of the spectrum.\n\n"
-            "Only the Peak, Low-shelf and High-shelf types use the Gain knob; with the others it's inactive.";
-        constexpr String k_eq_freq_tooltip =
-            "Frequency sets where this band does its work: the centre of a peak or notch, the corner of a shelf, or the cutoff of a pass filter.";
-        constexpr String k_eq_resonance_tooltip =
-            "Resonance sets how tightly the band is focused. For the Peak and Notch types it's the width, going from broad and gentle to tight and focused. The shelves use it to steepen the transition at their corner, and the pass filters use it to add a peak at the cutoff.";
-        constexpr String k_eq_gain_tooltip =
-            "Gain sets how far this band boosts or cuts at its frequency.\n\n"
-            "Only the Peak, Low-shelf and High-shelf types use Gain. The notch and pass filters always cut by their own fixed shape, so with those the knob is inactive.";
-
         lp(EqOn) = Args {
             .id = id(region, 35), // never change
             .id_string = LAYER_ID("eq.on"),

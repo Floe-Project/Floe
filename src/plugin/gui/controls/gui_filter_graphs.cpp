@@ -718,20 +718,23 @@ void DoEffectFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
         greyed_out);
 
     DescribedParamValue const* popup_params[] = {&cutoff_param, &reso_param, &gain_param};
-    DrawGrabberHandleAndPopup(g,
-                              {
-                                  .node_pos_viewport = node_pos(),
-                                  .handle_radius = handle_radius,
-                                  .interaction_id = interaction_id,
-                                  .grabber_window_r = grabber_window_r,
-                                  .graph_viewport_r = viewport_r,
-                                  .popup_params = popup_params,
-                                  .interactions = {.horizontal_drag = cutoff_param,
-                                                   .vertical_drag = uses_gain ? &gain_param : &reso_param,
-                                                   .scroll = &reso_param},
-                                  .greyed_out = greyed_out,
-                                  .active_cursor = CursorType::AllArrows,
-                              });
+    DrawGrabberHandleAndPopup(
+        g,
+        {
+            .node_pos_viewport = node_pos(),
+            .handle_radius = handle_radius,
+            .interaction_id = interaction_id,
+            .grabber_window_r = grabber_window_r,
+            .graph_viewport_r = viewport_r,
+            .popup_params = popup_params,
+            .interactions = {.horizontal_drag = cutoff_param,
+                             .vertical_drag = uses_gain ? &gain_param : &reso_param,
+                             .scroll = &reso_param},
+            .greyed_out = greyed_out,
+            .active_cursor = CursorType::AllArrows,
+            .tooltip =
+                "Click and drag to control the filter. Movement here is just another way to move the knobs beside it."_s,
+        });
 
     ParamIndex const editor_indices[] = {
         ParamIndex::FilterCutoff,
@@ -793,9 +796,10 @@ void DoReverbPreFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
-    DoFilterGraphAreaTooltip(g,
-                             viewport_r,
-                             "The reverb's pre-filter, applied before the signal enters the reverb."_s);
+    DoFilterGraphAreaTooltip(
+        g,
+        viewport_r,
+        "The reverb's pre-filter, shaping the signal entering the reverb. The dry signal keeps its full range."_s);
 
     auto const lp_param = params.DescribedValue(ParamIndex::ReverbPreLowPassCutoff);
     auto const hp_param = params.DescribedValue(ParamIndex::ReverbPreHighPassCutoff);
@@ -893,7 +897,10 @@ void DoReverbPostShelfGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
-    DoFilterGraphAreaTooltip(g, viewport_r, "The reverb's post-filter, applied to the reverb's output."_s);
+    DoFilterGraphAreaTooltip(
+        g,
+        viewport_r,
+        "The reverb's shelves, shaping the tail as it decays. The dry signal keeps its full range."_s);
 
     auto const lo_cut_param = params.DescribedValue(ParamIndex::ReverbLowShelfCutoff);
     auto const lo_gain_param = params.DescribedValue(ParamIndex::ReverbLowShelfGain);
@@ -1028,7 +1035,7 @@ void DoConvolutionReverbHighpassGraph(GuiState& g, Rect viewport_r, bool greyed_
     auto const cutoff_param = params.DescribedValue(ParamIndex::ConvolutionReverbHighpass);
 
     filter_graph_draw::DrawBackground(imgui, viewport_r, cutoff_param.info);
-    DoFilterGraphAreaTooltip(g, viewport_r, "The convolution reverb's highpass filter."_s);
+    DoFilterGraphAreaTooltip(g, viewport_r, "The high-pass filter applied to the reverb signal."_s);
 
     auto const node_pos = [&] {
         return f32x2 {viewport_r.x + (cutoff_param.LinearValue() * viewport_r.w),
@@ -1121,7 +1128,10 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
 
     auto const& freq_info = k_param_descriptors[ToInt(ParamIndex::FilterCutoff)];
     filter_graph_draw::DrawBackground(imgui, viewport_r, freq_info);
-    DoFilterGraphAreaTooltip(g, viewport_r, "The delay's filter, applied to the repeats."_s);
+    DoFilterGraphAreaTooltip(
+        g,
+        viewport_r,
+        "The delay's filter, applied to the repeats each time round the feedback loop."_s);
 
     auto const cutoff_param = params.DescribedValue(ParamIndex::DelayFilterCutoffSemitones);
     auto const spread_param = params.DescribedValue(ParamIndex::DelayFilterSpread);
@@ -1187,6 +1197,8 @@ void DoDelayFilterGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
             .interactions = {.horizontal_drag = cutoff_param, .vertical_drag = &spread_param},
             .greyed_out = greyed_out,
             .active_cursor = CursorType::AllArrows,
+            .tooltip =
+                "Click and drag to control the filter. Movement here is just another way to move the knobs beside it."_s,
         });
     DoResetParamsRightClickMenu(
         g,
@@ -1505,7 +1517,7 @@ static void DoEqGraphImpl(GuiState& g,
                 .active_cursor = CursorType::AllArrows,
                 .value_popup_heading = fmt::Format(g.scratch_arena, "Band {}", band_idx + 1),
                 .tooltip =
-                    "Click and drag to control the EQ band. Movement here is just another way to move the knobs below."_s,
+                    "Click and drag to control the EQ band. Movement here is just another way to move the band's knobs."_s,
             });
         OverlayMacroDestinationRegion(g, b.window_r, b.params.freq);
     }
@@ -1536,5 +1548,10 @@ void DoEqGraph(GuiState& g, u8 layer_index, Rect viewport_r, bool greyed_out) {
 }
 
 void DoEffectEqGraph(GuiState& g, Rect viewport_r, bool greyed_out) {
-    DoEqGraphImpl(g, k_effect_eq_band_params, viewport_r, greyed_out, "The EQ effect's 3-band response."_s);
+    DoEqGraphImpl(
+        g,
+        k_effect_eq_band_params,
+        viewport_r,
+        greyed_out,
+        "The combined response of the EQ's three bands. Drag a band's handle to move it, scroll over it to change its Resonance, or right-click it to change its type or copy and paste the whole band."_s);
 }

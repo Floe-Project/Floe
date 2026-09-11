@@ -396,34 +396,36 @@ static void DoImpulseResponseSelector(GuiState& g,
     auto const btn_row = DoMidPanelPrevNextRow(g.builder, selector_row, layout::k_fill_parent);
 
     // IR name button
-    auto const ir_btn =
-        DoBox(g.builder,
-              {
-                  .parent = btn_row,
-                  .text = ir_name,
-                  .text_colours = greyed_out ? Colours {LiveColStruct(UiColMap::MidTextDimmed)}
-                                             : Colours {ColSet {
-                                                   .base = LiveColStruct(UiColMap::MidText),
-                                                   .hot = LiveColStruct(UiColMap::MidTextHot),
-                                                   .active = LiveColStruct(UiColMap::MidTextOn),
-                                               }},
-                  .text_justification = TextJustification::CentredLeft,
-                  .text_overflow = TextOverflowType::ShowDotsOnRight,
-                  .layout {
-                      .size = {layout::k_fill_parent, k_mid_button_height},
-                  },
-                  .tooltip = FunctionRef<String()> {[&]() -> String {
-                      DynamicArray<char> buffer {g.scratch_arena};
-                      fmt::Append(buffer, "Impulse: {}", ir_name);
-                      if (auto const ir = CurrentIr(g.engine); ir && ir->description)
-                          fmt::Append(buffer, "\n{}", *ir->description);
-                      dyn::Append(buffer, '\n');
-                      if (greyed_out) dyn::AppendSpan(buffer, "Not active. ");
-                      dyn::AppendSpan(buffer, "The impulse response to use");
-                      return buffer.ToOwnedSpan();
-                  }},
-                  .button_behaviour = imgui::ButtonConfig {},
-              });
+    auto const ir_btn = DoBox(
+        g.builder,
+        {
+            .parent = btn_row,
+            .text = ir_name,
+            .text_colours = greyed_out ? Colours {LiveColStruct(UiColMap::MidTextDimmed)}
+                                       : Colours {ColSet {
+                                             .base = LiveColStruct(UiColMap::MidText),
+                                             .hot = LiveColStruct(UiColMap::MidTextHot),
+                                             .active = LiveColStruct(UiColMap::MidTextOn),
+                                         }},
+            .text_justification = TextJustification::CentredLeft,
+            .text_overflow = TextOverflowType::ShowDotsOnRight,
+            .layout {
+                .size = {layout::k_fill_parent, k_mid_button_height},
+            },
+            .tooltip = FunctionRef<String()> {[&]() -> String {
+                DynamicArray<char> buffer {g.scratch_arena};
+                if (greyed_out) dyn::AppendSpan(buffer, "Not active. ");
+                dyn::AppendSpan(
+                    buffer,
+                    "Open the IR Browser to choose an impulse response: the sample that gives this reverb its character."_s);
+                if (!g.engine.processor.convo.ir_id)
+                    dyn::AppendSpan(buffer, " There's no reverb until one is loaded."_s);
+                if (auto const ir = CurrentIr(g.engine); ir && ir->description)
+                    fmt::Append(buffer, "\n\n{}: {}", ir_name, *ir->description);
+                return buffer.ToOwnedSpan();
+            }},
+            .button_behaviour = imgui::ButtonConfig {},
+        });
 
     if (ir_btn.button_fired) {
         g.imgui.OpenModalViewport(g.ir_browser_state.k_panel_id);
@@ -669,12 +671,23 @@ static void DoSwitchboard(GuiState& g, Box root) {
                                         name);
                     s;
                 });
-                String const tooltip = fmt::Format(g.scratch_arena,
-                                                   "{}\n\n{}\n\nDrag to move {} along the chain.",
-                                                   k_effect_info[ToInt(fx->type)].description,
-                                                   action,
-                                                   name);
-                Tooltip(g, btn_id, window_slot_r, {.tooltip = tooltip});
+                String const tooltip = fmt::Format(
+                    g.scratch_arena,
+                    in_rack
+                        ? "{} is in the rack, processing the mix here in the chain, which runs from top to bottom.\n\n{}"_s
+                        : "{} isn't in the rack. Add it and it will process the mix here in the chain, which runs from top to bottom.\n\n{}"_s,
+                    name,
+                    k_effect_info[ToInt(fx->type)].description);
+
+                Tooltip(g,
+                        btn_id,
+                        window_slot_r,
+                        {
+                            .tooltip = tooltip,
+                            .tooltip_footer =
+                                fmt::Format(g.scratch_arena, "{} Drag to reorder the chain."_s, action),
+                            .placement = TooltipPlacement::RightThenBelow,
+                        });
 
                 DoEffectRightClickMenu(g, btn_id, window_slot_r, fx->type, true);
 
@@ -938,7 +951,6 @@ static void DoEffectParams(GuiState& g,
         case EffectType::FilterEffect: {
             bool const using_gain = engine.processor.filter_effect.IsUsingGainParam(params);
 
-            // Visualiser takes up its own row (full width of the param container).
             auto const vis_box = DoBox(g.builder,
                                        {
                                            .parent = param_container,
@@ -1513,6 +1525,7 @@ static void DoEffectParams(GuiState& g,
                 .marker_interval_db = 6,
                 .marker_db = ceiling_db - gain_db,
                 .marker_col = ToU32(highlight_col),
+                .marker_description = "Limiting starts at"_s,
                 .low_signal_threshold_db = -60.0f,
             };
             do_meter_column(
@@ -1546,6 +1559,7 @@ static void DoEffectParams(GuiState& g,
                 .marker_interval_db = 6,
                 .marker_db = ceiling_db,
                 .marker_col = ToU32(highlight_col),
+                .marker_description = "Ceiling"_s,
                 .low_signal_threshold_db = -50.0f,
             };
             do_meter_column(
@@ -1699,7 +1713,10 @@ DoEffectSections(GuiState& g, GuiFrameContext const& frame_context, Box root, Ef
                         .size = {19, 17},
                     },
                     .tooltip = FunctionRef<String()> {[&]() -> String {
-                        return fmt::Format(g.scratch_arena, "Remove {}", k_effect_info[ToInt(fx->type)].name);
+                        return fmt::Format(
+                            g.scratch_arena,
+                            "Take {} out of the rack so the chain skips past it. You can add it back from the switchboard on the left whenever you want it again."_s,
+                            k_effect_info[ToInt(fx->type)].name);
                     }},
                     .button_behaviour = imgui::ButtonConfig {},
                 });
@@ -1730,10 +1747,12 @@ DoEffectSections(GuiState& g, GuiFrameContext const& frame_context, Box root, Ef
                         .size = {19, 17},
                     },
                     .tooltip = FunctionRef<String()> {[&]() -> String {
-                        return fmt::Format(g.scratch_arena,
-                                           "{} {}",
-                                           is_on ? "Bypass" : "Activate",
-                                           k_effect_info[ToInt(fx->type)].name);
+                        return fmt::Format(
+                            g.scratch_arena,
+                            is_on
+                                ? "Bypass {}, letting the sound pass straight through while the effect stays in the rack. Useful for hearing exactly what it's contributing.\n\nA bypassed effect is skipped by the audio engine entirely, so it costs no CPU."_s
+                                : "Switch {} back on so it processes the sound again."_s,
+                            k_effect_info[ToInt(fx->type)].name);
                     }},
                     .button_behaviour = imgui::ButtonConfig {},
                 });
@@ -1980,11 +1999,12 @@ void MidPanelEffectsContent(GuiBuilder& builder,
                             Box tab_extra_buttons_box) {
     // Add randomise button to heading.
     {
-        auto const rand_btn =
-            DoMidPanelIconButton(builder,
-                                 tab_extra_buttons_box,
-                                 {.icon = MidPanelIcon::Shuffle,
-                                  .tooltip = "Randomise which effects are on and shuffle their order"_s});
+        auto const rand_btn = DoMidPanelIconButton(
+            builder,
+            tab_extra_buttons_box,
+            {.icon = MidPanelIcon::Shuffle,
+             .tooltip =
+                 "Roll the dice on the rack: each effect is randomly put in or taken out, and the chain is shuffled into a new order. A quick way to land on combinations you'd never have reached for, and you can undo if a roll doesn't work out."_s});
 
         if (rand_btn.button_fired) {
             BeginUndoableStep(g.engine, "Randomise effects"_s);
@@ -2021,13 +2041,23 @@ void MidPanelEffectsContent(GuiBuilder& builder,
             }
         }
 
-        auto const power_btn =
-            DoMidPanelIconButton(builder,
-                                 tab_extra_buttons_box,
-                                 {.icon = MidPanelIcon::Power,
-                                  .tooltip = any_on ? "Bypass all effects"_s : "Activate all effects"_s,
-                                  .greyed_out = !any_visible,
-                                  .is_on = any_on});
+        auto const power_tooltip = ({
+            String t;
+            if (!any_visible)
+                t = "Bypass every effect in the rack at once. The rack is empty at the moment, so there's nothing to bypass."_s;
+            else if (any_on)
+                t = "Bypass every effect in the rack at once, for a quick A/B against the dry sound of your layers. Click again to bring them all back."_s;
+            else
+                t = "Switch every effect in the rack back on, so the whole chain processes the sound again."_s;
+            t;
+        });
+
+        auto const power_btn = DoMidPanelIconButton(builder,
+                                                    tab_extra_buttons_box,
+                                                    {.icon = MidPanelIcon::Power,
+                                                     .tooltip = power_tooltip,
+                                                     .greyed_out = !any_visible,
+                                                     .is_on = any_on});
 
         if (power_btn.button_fired && any_visible) {
             BeginUndoableStep(g.engine, "Bypass all effects"_s);
@@ -2045,7 +2075,12 @@ void MidPanelEffectsContent(GuiBuilder& builder,
         auto const remove_btn = DoMidPanelIconButton(
             builder,
             tab_extra_buttons_box,
-            {.icon = MidPanelIcon::Unload, .tooltip = "Remove all effects"_s, .greyed_out = !any_visible});
+            {.icon = MidPanelIcon::Unload,
+             .tooltip =
+                 any_visible
+                     ? "Clear the rack, taking out every effect at once and leaving you an empty chain to build up again from the switchboard."_s
+                     : "Clear the rack, taking out every effect at once. The rack is already empty, so there's nothing to take out."_s,
+             .greyed_out = !any_visible});
 
         if (remove_btn.button_fired && any_visible) {
             BeginUndoableStep(g.engine, "Remove all effects"_s);

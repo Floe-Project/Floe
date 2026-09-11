@@ -121,6 +121,8 @@ MeterTooltipText PeakMeterTooltipText(ArenaAllocator& arena,
         "This is a stereo peak meter, showing the loudest moment of the signal.\n\nDisplay range: {.0} to {.0} dB",
         options.min_db,
         options.max_db);
+    if (options.marker_db && options.marker_description.size)
+        fmt::Append(buf, "\n{}: {.1} dB", options.marker_description, *options.marker_db);
     if (options.show_db_markers) fmt::Append(buf, "\nLines every: {.0} dB", options.marker_interval_db);
     if (options.show_warning_zones)
         fmt::Append(buf, "\nYellow region: {.0} to {.0} dB", options.yellow_zone_min_db, 0.0f);
@@ -141,7 +143,11 @@ MeterTooltipText GainReductionMeterTooltipText(ArenaAllocator& arena,
                                                DrawGainReductionMeterOptions const& options) {
     return {
         .value_popup = fmt::Format(arena, "{.1} dB reduction", options.gain_reduction_db),
-        .tooltip = fmt::Format(arena, "Range: {.0} to {.0} dB", 0.0f, options.max_reduction_db),
+        .tooltip = fmt::Format(
+            arena,
+            "This is a gain reduction meter, showing how much the limiter is turning the signal down.\n\nRange: {.0} to {.0} dB",
+            0.0f,
+            options.max_reduction_db),
     };
 }
 

@@ -42,7 +42,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Distortion:
                 info = {
                     .description =
-                        "Oversampled waveshaping distortion with a choice of algorithms, a punish control that cascades extra biased stages, and a tilt tone control.",
+                        "Push the signal through a shaping curve, for anything from gentle tape warmth to outright destruction. It's oversampled and anti-aliased, so even the hardest settings stay free of the grating tones that aliasing adds.",
                     .name = "Distortion",
                     .id = 1, // never change
                     .on_param_index = ParamIndex::DistortionOn,
@@ -52,7 +52,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::BitCrush:
                 info = {
                     .description =
-                        "Apply a lo-fi effect to the signal by either reducing the sample rate or by reducing the sample resolution. Doing either distorts the signal.",
+                        "A lo-fi effect that degrades the signal in two ways: dropping the sample rate for ringing, metallic aliasing, and reducing the bit depth for gritty quantisation noise. Both controls start at full quality, so lower them to hear the effect.",
                     .name = "Bit Crush",
                     .id = 2, // never change
                     .on_param_index = ParamIndex::BitCrushOn,
@@ -71,7 +71,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::FilterEffect:
                 info = {
                     .description =
-                        "Adjust the volume frequency bands in the signal, or cut out frequency bands altogether. The filter type can be selected with the menu.",
+                        "Filter the signal, either cutting away a region of the frequency range or boosting and dipping it.",
                     .name = "Filter",
                     .id = 4, // never change
                     .on_param_index = ParamIndex::FilterOn,
@@ -80,7 +80,8 @@ constexpr auto k_effect_info = []() {
                 break;
             case EffectType::StereoWiden:
                 info = {
-                    .description = "Increase or decrease the stereo width of the signal.",
+                    .description =
+                        "Narrow the signal towards mono, or spread it out wider than the speakers. There's also a Bass Mono mode that holds the low end in the centre while everything above it widens.",
                     .name = "Stereo Widen",
                     .id = 5, // never change
                     .on_param_index = ParamIndex::StereoWidenOn,
@@ -90,7 +91,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Chorus:
                 info = {
                     .description =
-                        "An effect that changes the character of the signal by adding a modulated and pitch-varying duplicate signal.",
+                        "Thicken the sound by layering it with delayed copies that drift in pitch. Gentle settings add a subtle shimmer and movement, while deeper settings give an obvious, tape-like wobble.",
                     .name = "Chorus",
                     .id = 6, // never change
                     .on_param_index = ParamIndex::ChorusOn,
@@ -100,7 +101,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Reverb:
                 info = {
                     .description =
-                        "Algorithmically simulate the reflections and reverberations of a real room.",
+                        "Algorithmically simulate the reflections and reverberations of a real space, from a small, tight room to a vast hall that takes many seconds to fade. Features modulation options for creating shimmering tails.",
                     .name = "Reverb",
                     .id = 7, // never change
                     .on_param_index = ParamIndex::ReverbOn,
@@ -110,7 +111,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Delay:
                 info = {
                     .description =
-                        "Simulate an echo effect, as if the sound is reflecting off of a distant surface.",
+                        "A fully-featured stereo echo, with separate left and right times, free or tempo-synced, a choice of ping-pong modes, and a filter that thins the repeats as they fade.",
                     .name = "Delay",
                     .id = 11, // never change
                     .on_param_index = ParamIndex::DelayOn,
@@ -120,7 +121,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::ConvolutionReverb:
                 info = {
                     .description =
-                        "The Convolution reverb effect applies a reverb to the signal. The characteristic of the reverb is determined by the impulse response (IR). The IR can be selected from the menu.",
+                        "Reverb whose character comes entirely from an impulse response (IR): a sample of how a space or object responds to sound. Most of the IRs on offer are strange and characterful, making this as much a sound-design tool as a reverb.",
                     .name = "Convol Reverb",
                     .id = 10, // never change
                     .on_param_index = ParamIndex::ConvolutionReverbOn,
@@ -129,7 +130,8 @@ constexpr auto k_effect_info = []() {
                 break;
             case EffectType::Phaser:
                 info = {
-                    .description = "Modulate the sound using a series of moving filters",
+                    .description =
+                        "Sweep a series of peaks and notches through the sound, giving it the classic swooshing, jet-like motion. Gentle settings add a subtle sense of movement to sustained sounds, while faster or more resonant ones become an unmistakable whoosh.",
                     .name = "Phaser",
                     .id = 9, // never change
                     .on_param_index = ParamIndex::PhaserOn,
@@ -139,7 +141,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Eq:
                 info = {
                     .description =
-                        "Three-band parametric equaliser. Each band can be configured as a peak, shelf, notch, low-pass or high-pass filter.",
+                        "A three-band equaliser for lifting or taming particular parts of the frequency range, from broad tonal shaping to surgical cuts.",
                     .name = "EQ",
                     .id = 8, // never change
                     .on_param_index = ParamIndex::EqOn,
@@ -149,7 +151,7 @@ constexpr auto k_effect_info = []() {
             case EffectType::Limiter:
                 info = {
                     .description =
-                        "A feedforward lookahead true-peak limiter for controlling stray dynamics and peaks. Typically placed at the end of the effects chain.",
+                        "Hold the signal below a set ceiling, either to catch stray peaks or to push the overall level up without clipping. It's a true-peak brickwall limiter with a very short lookahead, and usually belongs at the end of the effects chain.",
                     .name = "Limiter",
                     .id = 12, // never change
                     .on_param_index = ParamIndex::LimiterOn,

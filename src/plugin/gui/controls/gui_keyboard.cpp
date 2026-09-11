@@ -193,6 +193,23 @@ InternalKeyboardGui(GuiState& g, Rect r, s32 starting_octave, s8 num_octaves) {
                                     : -1;
     auto const col_keyswitch = ToU32(Col {.c = Col::Blue, .dark_mode = true, .alpha = 200});
 
+    auto const do_key_tooltip = [&](imgui::Id id, Rect key_rect, s32 key) {
+        Tooltip(
+            g,
+            id,
+            key_rect,
+            {
+                .tooltip =
+                    key == keyswitch_note
+                        ? "Reset keyswitch"_s
+                        : "Floe's keyboard shows playing notes and voices - but you can also click on it to trigger notes. It doesn't change colour or change based on what's loaded. It labels middle C as C3.\n\nWhen playing, the red marks along the top of a key "
+                          "show the voices currently sounding on that note. They can linger after you let go because each "
+                          "voice may play on through the release stage of its volume "
+                          "envelope."_s,
+                .tooltip_footer = "Click to play a note. Click lower down a key for a harder velocity."_s,
+            });
+    };
+
     auto const draw_keyswitch_marker = [&](s32 key, Rect key_rect, bool) {
         if (key != keyswitch_note) return;
         f32 const marker_h = Max(3.0f, key_rect.h * 0.08f);
@@ -281,8 +298,7 @@ InternalKeyboardGui(GuiState& g, Rect r, s32 starting_octave, s8 num_octaves) {
         overlay_key(this_abs_key, key_r, UiColMap::KeyboardNaturalVoiceOverlay);
         draw_keyswitch_marker(this_abs_key, key_r, false);
 
-        if (this_abs_key == keyswitch_note && imgui.IsHot(id))
-            Tooltip(g, id, key_r, {.tooltip = "Reset keyswitch"_s});
+        do_key_tooltip(id, key_r, this_abs_key);
 
         // Show the octave number if it's middle-C.
         if (this_abs_key == 60) {
@@ -383,8 +399,7 @@ InternalKeyboardGui(GuiState& g, Rect r, s32 starting_octave, s8 num_octaves) {
         overlay_key(this_abs_key, key_r, UiColMap::KeyboardSharpVoiceOverlay);
         draw_keyswitch_marker(this_abs_key, key_r, true);
 
-        if (this_abs_key == keyswitch_note && imgui.IsHot(id))
-            Tooltip(g, id, key_r, {.tooltip = "Reset keyswitch"_s});
+        do_key_tooltip(id, key_r, this_abs_key);
     }
     imgui.PopId();
 

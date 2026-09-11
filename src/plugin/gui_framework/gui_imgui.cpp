@@ -1074,37 +1074,57 @@ bool Context::SliderBehaviourFraction(SliderBehaviourFractionArgs const& args) {
     ASSERT(args.default_fraction >= 0 && args.default_fraction <= 1);
     f32 const start = args.fraction;
 
-    static f32 val_at_click = 0;
-    static f32x2 start_location = {};
-
     auto const& frame_input = GuiIo().in;
 
     if (ButtonBehaviour(args.rect_in_window_coords, args.id, SliderConfig::k_activation_cfg)) {
         if ((args.cfg.default_on_modifer) && frame_input.modifiers.Get(ModifierKey::Modifier))
             args.fraction = args.default_fraction;
-        val_at_click = args.fraction;
-        start_location = frame_input.cursor_pos;
+        slider_drag = {
+            .id = args.id,
+            .origin = frame_input.cursor_pos,
+            .fraction_at_origin = args.fraction,
+            .fraction = args.fraction,
+            .shift_held = frame_input.modifiers.Get(ModifierKey::Shift),
+        };
     }
 
-    if (IsActive(args.id, SliderConfig::k_activation_cfg.mouse_button)) {
+    if (slider_drag.id == args.id && IsActive(args.id, SliderConfig::k_activation_cfg.mouse_button)) {
         f32 sensitivity = args.cfg.sensitivity;
         if (args.cfg.slower_with_shift) {
-            if (frame_input.Key(KeyCode::ShiftL).presses.size ||
-                frame_input.Key(KeyCode::ShiftR).presses.size) {
-                val_at_click = args.fraction;
-                start_location = frame_input.cursor_pos;
+            auto const shift_held = frame_input.modifiers.Get(ModifierKey::Shift);
+            if (shift_held != slider_drag.shift_held) {
+                // Restart the drag from where it currently is so that entering or leaving the finer
+                // sensitivity doesn't move the value.
+                slider_drag.shift_held = shift_held;
+                slider_drag.origin = frame_input.cursor_pos;
+                slider_drag.fraction_at_origin = slider_drag.fraction;
+                slider_drag.dead_zone_offset = 0;
             }
-            if (frame_input.modifiers.Get(ModifierKey::Shift))
-                sensitivity *= args.cfg.shift_sensitivity_multiplier;
+            if (shift_held) sensitivity *= args.cfg.shift_sensitivity_multiplier;
         }
         if (All(frame_input.cursor_pos != -1)) {
-            auto d = frame_input.cursor_pos - start_location;
+            auto d = frame_input.cursor_pos - slider_drag.origin;
             d.x = -d.x;
             // Change value regardless of if dragged horizontally or vertically.
             auto distance_from_drag_start = d.x + d.y;
             if (d.x > 0 && d.y > 0) distance_from_drag_start = Sqrt(Pow(d.x, 2.0f) + Pow(d.y, 2.0f));
             if (d.x < 0 && d.y < 0) distance_from_drag_start = -Sqrt(Pow(-d.x, 2.0f) + Pow(-d.y, 2.0f));
-            args.fraction = val_at_click - distance_from_drag_start / sensitivity;
+
+            if (!slider_drag.engaged) {
+                auto const dead_zone = WwToPixels(args.cfg.dead_zone_ww);
+                if (Abs(distance_from_drag_start) <= dead_zone) {
+                    distance_from_drag_start = 0;
+                } else {
+                    slider_drag.engaged = true;
+                    // Subtracted from here on so that the value doesn't jump as the drag engages.
+                    slider_drag.dead_zone_offset = distance_from_drag_start > 0 ? dead_zone : -dead_zone;
+                }
+            }
+            distance_from_drag_start -= slider_drag.dead_zone_offset;
+
+            slider_drag.fraction =
+                Clamp(slider_drag.fraction_at_origin - distance_from_drag_start / sensitivity, 0.0f, 1.0f);
+            args.fraction = slider_drag.fraction;
         }
     }
 

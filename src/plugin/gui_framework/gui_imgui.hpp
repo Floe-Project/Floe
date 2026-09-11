@@ -133,6 +133,10 @@ struct SliderConfig {
 
     // Set the slider's value to its default when its clicked while holding the modifier key.
     bool32 default_on_modifer : 1 = true;
+
+    // Distance in ww that the cursor must travel before the drag takes effect, so that a click which drifts
+    // by a pixel or two doesn't edit the value.
+    f32 dead_zone_ww = 3;
 };
 
 struct TextInputConfig {
@@ -925,6 +929,19 @@ struct Context {
     };
     TooltipFadeState immediate_tooltip = {};
     TooltipFadeState delayed_tooltip = {};
+
+    // The slider that is currently being dragged, if any. 'fraction' is the exact drag position; widgets
+    // that commit stepped values keep their position within a step here rather than in the value itself.
+    struct SliderDragState {
+        Id id = k_null_id;
+        f32x2 origin = {};
+        f32 fraction_at_origin = 0;
+        f32 fraction = 0;
+        f32 dead_zone_offset = 0;
+        bool engaged = false;
+        bool shift_held = false;
+    };
+    SliderDragState slider_drag = {};
 
     Id hovered_item = k_null_id;
     Id temp_hovered_item = k_null_id;

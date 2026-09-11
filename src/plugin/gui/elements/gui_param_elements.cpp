@@ -634,7 +634,6 @@ Box DoMenuParameter(GuiState& g,
                     ParameterJustStartedMoving(g.engine.processor, param.info.index);
                 }
 
-                auto const initial_int_val = param.IntValue<int>();
                 auto current = param.LinearValue();
                 if (g.builder.imgui.SliderBehaviourRange({
                         .rect_in_window_coords = window_r,
@@ -645,8 +644,13 @@ Box DoMenuParameter(GuiState& g,
                         .default_value = param.info.default_linear_value,
                         .cfg = {.sensitivity = WwToPixels(20.0f)},
                     })) {
-                    new_val = current;
-                    if ((int)current != initial_int_val) slider_value_changed_during_interaction = true;
+                    // Commit the nearest option rather than the drag position, so that every option takes
+                    // the same amount of travel and the parameter never sits between two options.
+                    auto const stepped = Round(current);
+                    if (stepped != param.LinearValue()) {
+                        new_val = stepped;
+                        slider_value_changed_during_interaction = true;
+                    }
                 }
             }
 
@@ -1362,7 +1366,12 @@ Box DoIntParameter(GuiState& g,
                                          (int)param.info.linear_range.max);
                 }
             }
-            if (dragger_result.value_changed) new_val = (f32)(int)val;
+            if (dragger_result.value_changed) {
+                // Commit the nearest step rather than the drag position, so that every step takes the same
+                // amount of travel and the parameter never sits between two steps.
+                auto const stepped = Round(val);
+                if (stepped != param.LinearValue()) new_val = stepped;
+            }
             param_text_input_result = dragger_result.text_input_result;
 
             if (g.imgui.WasJustActivated(dragger_box.imgui_id, MouseButton::Left))
@@ -1509,7 +1518,10 @@ Box DoPercentDraggerParameter(GuiState& g,
                 if (auto const o = ParseInt(*dragger_result.new_string_value, ParseIntBase::Decimal))
                     new_val = Clamp((f32)o.Value(), min_percent, max_percent) / 100.0f;
             }
-            if (dragger_result.value_changed) new_val = Round(val) / 100.0f;
+            if (dragger_result.value_changed) {
+                auto const stepped = Round(val) / 100.0f;
+                if (stepped != param.LinearValue()) new_val = stepped;
+            }
             param_text_input_result = dragger_result.text_input_result;
 
             if (g.imgui.WasJustActivated(dragger_box.imgui_id, MouseButton::Left))

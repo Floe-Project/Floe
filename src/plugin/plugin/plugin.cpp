@@ -115,6 +115,11 @@ inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 static u16 g_floe_instances_initialised {};
 static Array<FloePluginInstance*, k_max_num_floe_instances> g_floe_instances {};
 
+// The params value_to_text/text_to_value callbacks are thread-safe (a host may call them from any
+// thread), but preferences may only be read on the main thread. We mirror the preference here and keep
+// it in sync from the main thread via the preference-changed handler.
+static Atomic<bool> g_show_cutoff_in_semitones {false};
+
 inline void LogClapFunction(FloePluginInstance& floe, ClapFunctionType level, String name) {
     if (k_clap_logging_level >= level) LogInfo(ModuleName::Clap, "{} #{}", name, floe.index);
 }
@@ -954,7 +959,7 @@ static bool ClapParamsValueToText(clap_plugin_t const* plugin,
         if (!desc.linear_range.Contains((f32)value)) return false;
 
         auto const str =
-            desc.LinearValueToString((f32)value, ShowCutoffInSemitones(g_shared_engine_systems->prefs));
+            desc.LinearValueToString((f32)value, g_show_cutoff_in_semitones.Load(LoadMemoryOrder::Relaxed));
         if (!str) return false;
 
         if (out_buffer_capacity < (str->size + 1)) return false;
@@ -990,7 +995,7 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
         if (!Check(floe, param_value_text, k_func, "param_value_text is null")) return false;
         if (auto v = k_param_descriptors[index].StringToLinearValue(
                 FromNullTerminated(param_value_text),
-                ShowCutoffInSemitones(g_shared_engine_systems->prefs))) {
+                g_show_cutoff_in_semitones.Load(LoadMemoryOrder::Relaxed))) {
             if (!Check(floe, out_value, k_func, "out_value is null")) return false;
             *out_value = (f64)*v;
             ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
@@ -1511,6 +1516,9 @@ static bool ClapInit(const struct clap_plugin* plugin) {
 
             g_shared_engine_systems.Emplace(tags);
 
+            g_show_cutoff_in_semitones.Store(ShowCutoffInSemitones(g_shared_engine_systems->prefs),
+                                             StoreMemoryOrder::Relaxed);
+
             LogInfo(ModuleName::Clap, "host: {} {} {}", floe.host.vendor, floe.host.name, floe.host.version);
 
             if constexpr (!PRODUCTION_BUILD) ReportError(ErrorLevel::Info, k_nullopt, "Floe plugin loaded"_s);
@@ -1944,6 +1952,9 @@ HandleSizePreferenceChanged(FloePluginInstance& floe, prefs::Key const& key, pre
 
 static void HandleCutoffDisplayUnitPreferenceChanged(FloePluginInstance& floe, prefs::Key const& key) {
     if (key != SettingDescriptor(GuiPreference::ShowCutoffInSemitones).key) return;
+
+    g_show_cutoff_in_semitones.Store(ShowCutoffInSemitones(g_shared_engine_systems->prefs),
+                                     StoreMemoryOrder::Relaxed);
 
     auto const host_params = (clap_host_params_t const*)floe.host.get_extension(&floe.host, CLAP_EXT_PARAMS);
     if (!host_params) return;
